@@ -1,0 +1,36 @@
+{
+    "name": "whitedigital-eu/etl-bundle",
+    "description": "Extract/Transform/Load processing bundle for Symfony 6+",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "WhiteDigital\\EtlBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "WhiteDigital\\Tests\\": "tests/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Andis Cirulis",
+            "email": "andis.cirulis@whitedigital.eu"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "php": ">=8.1",
+        "symfony/dependency-injection": "^6.1",
+        "symfony/config": "^6.1"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.x-dev"
+        }
+    },
+    "require-dev": {
+        "symfony/http-kernel": "^6.1"
+    }
+}
