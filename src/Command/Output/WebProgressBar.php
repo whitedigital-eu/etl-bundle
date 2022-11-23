@@ -39,7 +39,7 @@ final class WebProgressBar
         ++$this->position;
         $percentage = round($this->position / $this->max * 100, 0);
         $percentsPerPosition = 100 / $this->maxPrintedPositions;
-        $pointsPerAdvance = $this->max > 100 ? 1 : floor($this->maxPrintedPositions / $this->max);
+        $pointsPerAdvance = $this->max > 100 ? 1 : (int)floor($this->maxPrintedPositions / $this->max);
         if ($percentage > ($this->printedPositions * $percentsPerPosition)) {
             $this->output->write(str_repeat('.', $pointsPerAdvance));
             $this->printedPositions += $pointsPerAdvance;

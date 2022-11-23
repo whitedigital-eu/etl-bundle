@@ -18,6 +18,9 @@ use WhiteDigital\EtlBundle\Extractor\ExtractorInterface;
 use WhiteDigital\EtlBundle\Loader\LoaderInterface;
 use WhiteDigital\EtlBundle\Transformer\TransformerInterface;
 
+/**
+ * @deprecated
+ */
 abstract class BasePipelineProcessor
 {
     protected OutputInterface $output;
@@ -84,22 +87,7 @@ abstract class BasePipelineProcessor
         return $tableName;
     }
 
-    /**
-     * Explicitly fetch lazy, except for $fetchEager fields.
-     *
-     * @param class-string $class
-     * @param string[]     $fetchEager
-     *
-     * @return BaseEntity[]
-     */
-    protected function getExistingRecords(string $class, array $fetchEager, string $indexProperty): array
-    {
-        $repository = $this->entityManager->getRepository($class);
-        $indexedCollection = $repository->findAllLazy($fetchEager, $indexProperty);
-        $this->entityManager->clear();
 
-        return $indexedCollection;
-    }
 
     /**
      * @throws EtlException
@@ -124,45 +112,14 @@ abstract class BasePipelineProcessor
         return $validated;
     }
 
-    /**
-     * Gets or creates classifier by given value (and type).
-     *
-     * @param string[] $data
-     *
-     * @throws TransformerException
-     */
-    protected function getClassifierIdByValue(?string $value, ?array $data, ClassifierTypeEnum $type): ?int
-    {
-        if (empty($value)) {
-            return null;
-        }
-        $classifier_repository = $this->entityManager->getRepository(Classifier::class);
-        $collection = $classifier_repository->findBy(['value' => $value]);
-        if (1 < count($collection)) {
-            throw new TransformerException(sprintf('More than one classifier found with value %s', $value));
-        }
-        if (1 === count($collection)) {
-            $this->entityManager->clear();
 
-            return $collection[0]->getId();
-        }
-        $classifier = new Classifier();
-        $classifier->setType($type);
-        $classifier->setValue($value);
-        $classifier->setData($data);
-        $this->entityManager->persist($classifier);
-        $this->entityManager->flush();
-        $this->entityManager->clear();
-
-        return $classifier->getId();
-    }
 
     protected function addValidator(EtlValidator $validator): void
     {
         $this->validators[] = $validator;
     }
 
-    protected function printValidatorFailures(): void
+    public function printValidatorFailures(): void
     {
         if (!empty($vf = $this->validatorFailures)) {
             $this->output->writeln("\n<comment>Validācijas paziņojumi (neimportētie dati):</comment>");

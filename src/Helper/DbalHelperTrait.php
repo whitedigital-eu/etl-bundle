@@ -4,28 +4,44 @@ declare(strict_types=1);
 
 namespace WhiteDigital\EtlBundle\Helper;
 
-use App\ETL\Exception\EtlException;
 use DateTime;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\DBAL\Statement;
 use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\Persistence\ManagerRegistry;
+use Doctrine\Persistence\Mapping\ClassMetadata;
 use http\Exception\RuntimeException;
 use JetBrains\PhpStorm\ArrayShape;
 use Symfony\Component\PropertyAccess\PropertyAccess;
 use Symfony\Contracts\Service\Attribute\Required;
 use WhiteDigital\EntityResourceMapper\Entity\BaseEntity;
+use WhiteDigital\EtlBundle\Exception\EtlException;
 
 trait DbalHelperTrait
 {
     private ManagerRegistry $doctrine;
 
+
     #[Required]
     public function setDoctrine(ManagerRegistry $doctrine): void
     {
         $this->doctrine = $doctrine;
+    }
+
+    /**
+     * @param class-string $class
+     */
+    protected function getTableName(string $class): string
+    {
+        $tableName = $this->entityManager->getClassMetadata($class)->getTableName();
+        if ('user' === $tableName) { // reserved keywords must be double-quoted in PostgreSQL
+            $tableName = sprintf('"%s"', $tableName);
+        }
+
+        return $tableName;
     }
 
     /**
@@ -38,8 +54,9 @@ trait DbalHelperTrait
     }
 
     /**
-     * @param bool $addCreated
-     *
+     * @param string $table
+     * @param array|object $data
+     * @param int $id
      * @throws EtlException
      * @throws Exception
      */
@@ -49,10 +66,13 @@ trait DbalHelperTrait
         $query->executeQuery();
     }
 
+    /**
+     * @deprecated
+     */
     protected function createDBALInsertQuery(string $table, array|object $data, bool $addCreated = true): QueryBuilder
     {
         /**
-         * @var Connection   $connection ;
+         * @var Connection $connection
          * @var QueryBuilder $query
          */
         $connection = $this->doctrine->getConnection();
@@ -62,12 +82,156 @@ trait DbalHelperTrait
         foreach ($data as $col => $val) {
             $queryBuilder
                 ->setParameter($this->toColumnName($col), $val)
-                ->setValue($this->toColumnName($col), ':'.$this->toColumnName($col));
+                ->setValue($this->toColumnName($col), ':' . $this->toColumnName($col));
         }
         if ($addCreated) {
             $queryBuilder->setValue('created_at', ':created_at')
                 ->setParameter('created_at', (new DateTime())->format('Y-m-d H:i:s'));
         }
+
+        return $queryBuilder;
+    }
+
+    protected function createDBALInsertQueryFromEntity(BaseEntity $entity, bool $addCreated = true): QueryBuilder
+    {
+        /**
+         * @var Connection $connection
+         * @var QueryBuilder $query
+         */
+        $connection = $this->doctrine->getConnection();
+        $queryBuilder = $connection->createQueryBuilder();
+
+        $table = $this->getTableName($entity::class);
+
+        /** @var \Doctrine\ORM\Mapping\ClassMetadata $entityMetaData */
+        $entityMetaData = $this->doctrine->getManager()->getClassMetadata($entity::class);
+
+        $queryBuilder->insert($table);
+
+        $reflection = new \ReflectionObject($entity);
+        $fieldNames = $entityMetaData->getFieldNames();
+        $associationMappings = $entityMetaData->getAssociationMappings();
+
+
+        foreach ($reflection->getProperties() as $property) {
+            $propertyName = $property->getName();
+
+            // process scalar types
+            if (in_array($propertyName, $fieldNames, true) && (null !== $value = $property->getValue($entity))) {
+                $columnName = $entityMetaData->getColumnName($propertyName);
+                $queryBuilder
+                    ->setValue($columnName, ':' . $columnName)
+                    ->setParameter($columnName, $value);
+                continue;
+            }
+            // process associations
+            if (array_key_exists($propertyName, $associationMappings) && (null !== $value = $property->getValue($entity))) {
+                if ($value instanceof ArrayCollection) {
+                    //TODO how to proceed with many to many associations?
+                    continue;
+                }
+                if (1 === count($joinColumn = $associationMappings[$propertyName]['joinColumnFieldNames'])) {
+                    $columnName = current($joinColumn);
+                    $queryBuilder
+                        ->setValue($columnName, ':' . $columnName)
+                        ->setParameter($columnName, $value->getId());
+                    continue;
+                } else {
+                    continue;
+                    // TODO handle multiple join columns
+                }
+            }
+        }
+
+        if ($addCreated) {
+            $queryBuilder->setValue('created_at', ':created_at')
+                ->setParameter('created_at', (new DateTime())->format('Y-m-d H:i:s'));
+        }
+
+        return $queryBuilder;
+    }
+
+
+    /**
+     * Will return null, if nothing to update, QueryBuilder otherwise
+     * @param BaseEntity $existingEntity
+     * @param BaseEntity $newEntity
+     * @return QueryBuilder|null
+     * @throws EtlException
+     */
+    protected function createDBALUpdateQueryFromEntity(BaseEntity $existingEntity, BaseEntity $newEntity): ?QueryBuilder
+    {
+        if (get_class($existingEntity) !== get_class($newEntity)) {
+            throw new EtlException('createDBALUpdateQueryFromEntity must receive objects from same class.');
+        }
+        $hasChanges = false;
+        /**
+         * @var Connection $connection
+         * @var QueryBuilder $query
+         */
+        $connection = $this->doctrine->getConnection();
+        $queryBuilder = $connection->createQueryBuilder();
+
+        $table = $this->getTableName($existingEntity::class);
+
+        /** @var \Doctrine\ORM\Mapping\ClassMetadata $entityMetaData */
+        $entityMetaData = $this->doctrine->getManager()->getClassMetadata($existingEntity::class);
+
+        $queryBuilder->update($table);
+
+        $reflection = new \ReflectionObject($existingEntity);
+        $fieldNames = $entityMetaData->getFieldNames();
+        $associationMappings = $entityMetaData->getAssociationMappings();
+
+
+        foreach ($reflection->getProperties() as $property) {
+            $propertyName = $property->getName();
+
+            // process scalar types
+            if (in_array($propertyName, $fieldNames, true)
+                && (null === $property->getValue($existingEntity))
+                && (null !== $value = $property->getValue($newEntity))
+            ) {
+                $columnName = $entityMetaData->getColumnName($propertyName);
+                $queryBuilder
+                    ->set($columnName, ':' . $columnName)
+                    ->setParameter($columnName, $value);
+                $hasChanges = true;
+                continue;
+            }
+            // process associations
+            if (array_key_exists($propertyName, $associationMappings)
+                && (null === $property->getValue($existingEntity))
+                && (null !== $value = $property->getValue($newEntity))
+            ) {
+                if ($value instanceof ArrayCollection) {
+                    //TODO how to proceed with many to many associations?
+                    continue;
+                }
+                if (1 === count($joinColumn = $associationMappings[$propertyName]['joinColumnFieldNames'])) {
+                    $columnName = current($joinColumn);
+                    $queryBuilder
+                        ->set($columnName, ':' . $columnName)
+                        ->setParameter($columnName, $value->getId());
+                    $hasChanges = true;
+                    continue;
+                } else {
+                    continue;
+                    // TODO handle multiple join columns
+                }
+            }
+        }
+
+        if (!$hasChanges) {
+            return null;
+        }
+
+        // set condition
+        $queryBuilder->where('id = :id')
+            ->setParameter('id', $existingEntity->getId());
+        // always set Updated
+        $queryBuilder->set('updated_at', ':updated_at')
+            ->setParameter('updated_at', (new DateTime())->format('Y-m-d H:i:s'));
 
         return $queryBuilder;
     }
@@ -126,7 +290,7 @@ trait DbalHelperTrait
     {
         $data = $this->normalizeData($data);
         if ($addCreated) {
-            $data['createdAt'] = (new \DateTime())->format('Y-m-d H:i:s');
+            $data['created_at'] = (new \DateTime())->format('Y-m-d H:i:s');
         }
         /** @var Connection $connection */
         $connection = $this->doctrine->getConnection();
@@ -149,7 +313,7 @@ trait DbalHelperTrait
     {
         $data = $this->normalizeData($data);
         if ($addCreated) {
-            $data['createdAt'] = (new \DateTime())->format('Y-m-d H:i:s');
+            $data['created_at'] = (new \DateTime())->format('Y-m-d H:i:s');
         }
         /** @var Connection $connection */
         $connection = $this->doctrine->getConnection();
@@ -160,7 +324,7 @@ trait DbalHelperTrait
     }
 
     /**
-     * @throws EtlException
+     * @deprecated
      */
     protected function createDBALUpdateQuery(string $table, array $data, int $id): ?QueryBuilder
     {
@@ -171,14 +335,14 @@ trait DbalHelperTrait
             throw new EtlException(sprintf('empty ID received for %s', __METHOD__));
         }
         /**
-         * @var Connection   $connection ;
+         * @var Connection $connection ;
          * @var QueryBuilder $query
          */
         $connection = $this->doctrine->getConnection();
         $queryBuilder = $connection->createQueryBuilder();
         $queryBuilder->update($table);
         foreach ($data as $col => $val) {
-            $queryBuilder->set($this->toColumnName($col), ':'.$this->toColumnName($col))
+            $queryBuilder->set($this->toColumnName($col), ':' . $this->toColumnName($col))
                 ->setParameter($this->toColumnName($col), $val);
         }
         // set condition
@@ -212,8 +376,7 @@ trait DbalHelperTrait
     }
 
     /**
-     * @throws \ReflectionException
-     * @throws \Exception
+     * @deprecated
      */
     protected function returnUpdatedFields(BaseEntity $existingEntity, object $transformedRecord, array $skipFields = [], bool $replaceExisting = false): array
     {
@@ -227,7 +390,7 @@ trait DbalHelperTrait
             if (str_ends_with($key, 'Id')) { // It is ORM relation. For example customerId, we should get customer->getId()
                 $isRelation = true;
                 $relationName = substr($key, 0, -2);
-                $getterMethod = 'get'.ucfirst($relationName);
+                $getterMethod = 'get' . ucfirst($relationName);
                 if (!method_exists($existingEntity, $getterMethod)) {
                     throw new RuntimeException("{$getterMethod} does not exist in existingEntity object.");
                 }
@@ -256,6 +419,36 @@ trait DbalHelperTrait
         }
 
         return $updatedFields;
+    }
+
+    /**
+     * Will return array where first field will be key and rest as array
+     * @param string $sql
+     * @return array<string, array>
+     * @throws Exception
+     */
+    protected function createExistingHashMap(string $sql): array
+    {
+        $output = [];
+
+        /**
+         * @var Connection $connection
+         */
+        $connection = $this->doctrine->getConnection();
+        $results = $connection->executeQuery($sql);
+        foreach ($results->iterateAssociative() as $record) {
+            $isFirst = true;
+            $hash = '';
+            foreach($record as $key => $value) {
+                if ($isFirst) {
+                    $hash = $value;
+                    $isFirst = false;
+                    continue;
+                }
+                $output[$hash][$key] = $value;
+            }
+        }
+        return $output;
     }
 
     /**
@@ -290,4 +483,6 @@ trait DbalHelperTrait
     {
         return (new UnderscoreNamingStrategy())->propertyToColumnName($propertyName);
     }
+
+
 }

@@ -1,7 +1,7 @@
 # Extract Transform Load process Symfony bundle
 
 Package for running ETL tasks.  
-1. Define custom Extractors, Transformers and Runners
+1. Define custom Extractors, Transformers and Loaders
 2. Create pipeline to run specific data import/export process.
 
 Tasks can be run:  
