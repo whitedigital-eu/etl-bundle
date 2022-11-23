@@ -1,14 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace WhiteDigital\EtlBundle\Loader;
 
+use App\Enum\AuditCategoryEnum;
 use App\Service\AuditService;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Exception;
+use WhiteDigital\EtlBundle\Command\Output\WebProgressBar;
 use WhiteDigital\EtlBundle\Exception\LoaderException;
-use WhiteDigital\EtlBundle\Helper\BasePipelineProcessor;
+use WhiteDigital\EtlBundle\Helper\CallbackQuery;
 use WhiteDigital\EtlBundle\Helper\Queue;
 
 /**
@@ -16,12 +20,13 @@ use WhiteDigital\EtlBundle\Helper\Queue;
  * Element can be either instance of QueryBuilder (single DBAL query) or CallbackQuery (callback function to execute)
  * Loop is wrapped inside transaction.
  */
-class DoctrineDbalLoader extends BasePipelineProcessor implements LoaderInterface
+class DoctrineDbalLoader extends AbstractLoader
 {
     public function __construct(
-        private readonly AuditService $audit,
+        private readonly AuditService    $audit,
         private readonly ManagerRegistry $doctrine,
-    ) {
+    )
+    {
     }
 
     /**
@@ -32,7 +37,6 @@ class DoctrineDbalLoader extends BasePipelineProcessor implements LoaderInterfac
      */
     public function run(Queue $data): void
     {
-        $this->runBase();
         if (0 === count($data)) {
             $this->output->writeln('Nav izpildāmu datu bāzes vaicājumu.');
 
@@ -79,7 +83,7 @@ class DoctrineDbalLoader extends BasePipelineProcessor implements LoaderInterfac
             $this->output->writeln(sprintf("\nDatu bāzes vaicājumi pabeigti ar %s INSERT and %s UPDATE operācijām.\n", $numberInserts, $numberUpdates));
             $connection->commit();
             if ($numberInserts > 0 || $numberUpdates > 0) {
-                $this->audit->audit(AuditService::CATEGORY_ETL_PIPELINE, sprintf('Loader query log with %s INSERTs and %s UPDATEs', $numberInserts, $numberUpdates), $queryLog);
+                $this->audit->audit(AuditCategoryEnum::ETLPipeline, sprintf('Loader query log with %s INSERTs and %s UPDATEs', $numberInserts, $numberUpdates), $queryLog);
             }
         } catch (Exception $exception) {
             $connection->rollBack();

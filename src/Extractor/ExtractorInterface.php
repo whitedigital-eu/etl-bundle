@@ -8,7 +8,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use WhiteDigital\EtlBundle\Helper\Queue;
 
-#[AutoconfigureTag('etl.etl_extractor')]
+#[AutoconfigureTag('etl.extractor')]
 interface ExtractorInterface
 {
     /**
@@ -20,5 +20,12 @@ interface ExtractorInterface
 
     public function setOutput(OutputInterface $output): void;
 
+    /**
+     * @param array<string, mixed> $options
+     * @return void
+     */
     public function setOptions(array $options): void;
+    public function getOption(string $key): mixed;
+
+    public function displayStartupMessage(): void;
 }

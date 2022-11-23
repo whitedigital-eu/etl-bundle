@@ -12,7 +12,6 @@ class AsTask
 {
     public function __construct(
         public string $name,
-        public int    $id,
     )
     {
     }

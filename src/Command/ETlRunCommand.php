@@ -8,13 +8,14 @@ declare(strict_types=1);
 
 namespace WhiteDigital\EtlBundle\Command;
 
+use Psr\Container\ContainerExceptionInterface;
+use Psr\Container\NotFoundExceptionInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
-use WhiteDigital\EtlBundle\Task\EtlTasks;
+use WhiteDigital\EtlBundle\Task\EtlTaskRunner;
 
 #[AsCommand('etl:run')]
 class ETlRunCommand extends Command
@@ -22,19 +23,21 @@ class ETlRunCommand extends Command
     private const ETL_PIPELINE_ID = 'etl_pipeline_id';
 
     public function __construct(
-        private readonly EtlTasks $etlTasks,
+        private readonly EtlTaskRunner $etlTaskRunner,
     )
     {
         parent::__construct();
     }
 
     /**
-     * @throws TransportExceptionInterface
+     * @throws \ReflectionException
+     * @throws ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $output->writeln('ETL task runner started.');
-        $this->etlTasks->runTaskById($input->getArgument(self::ETL_PIPELINE_ID), $output);
+        $output->writeln('<info>ETL task runner started. You can see available tasks by etl:list command.</info>');
+        $this->etlTaskRunner->runTaskByName($output, name: $input->getArgument(self::ETL_PIPELINE_ID));
         return Command::SUCCESS;
     }
 

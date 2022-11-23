@@ -14,6 +14,5 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag('etl.task')]
 interface EtlTaskInterface
 {
-    public function setTaskNameAndId(string $name, int $id): void;
     public function runTask(OutputInterface $output): void;
 }

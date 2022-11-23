@@ -2,6 +2,7 @@
 
 namespace WhiteDigital\EtlBundle;
 
+use App\Enum\AuditCategoryEnum;
 use App\Service\AuditService;
 use Exception;
 use Psr\Container\ContainerExceptionInterface;
@@ -27,29 +28,22 @@ class EtlPipeline
     private ?TransformerInterface $transformer = null;
     private ?LoaderInterface $loader = null;
 
-    private ServiceLocator $extractors;
-    private ServiceLocator $transformers;
-    private ServiceLocator $loaders;
-
-    /**
-     * @param ServiceLocator $extractors
-     * @param ServiceLocator $transformers
-     * @param ServiceLocator $loaders
-     */
     public function __construct(
-        private readonly NotificationService                        $notificationService,
-        private readonly RepositoryCacheService                     $repositoryCache,
-        private readonly AuditService                               $audit,
-        #[TaggedLocator(tag: 'etl.etl_extractor')] ServiceLocator   $extractors,
-        #[TaggedLocator(tag: 'etl.etl_transformer')] ServiceLocator $transformers,
-        #[TaggedLocator(tag: 'etl.etl_loader')] ServiceLocator      $loaders,
-    ) {
-        $this->extractors = $extractors;
-        $this->transformers = $transformers;
-        $this->loaders = $loaders;
+        private readonly NotificationService                                     $notificationService,
+        private readonly RepositoryCacheService                                  $repositoryCache,
+        private readonly AuditService                                            $audit,
+        #[TaggedLocator(tag: 'etl.extractor')] private readonly ServiceLocator   $extractors,
+        #[TaggedLocator(tag: 'etl.transformer')] private readonly ServiceLocator $transformers,
+        #[TaggedLocator(tag: 'etl.loader')] private readonly ServiceLocator      $loaders,
+    )
+    {
     }
 
+
     /**
+     * @param class-string $className
+     * @param array<string, mixed> $options
+     * @return $this
      * @throws EtlException
      */
     public function addExtractor(string $className, array $options = []): static
@@ -65,7 +59,11 @@ class EtlPipeline
         return $this;
     }
 
+
     /**
+     * @param class-string $className
+     * @param array<string, mixed> $options
+     * @return $this
      * @throws EtlException
      */
     public function addTransformer(string $className, array $options = []): static
@@ -124,9 +122,9 @@ class EtlPipeline
     }
 
     /**
+     * @return $this
      * @deprecated remove this method, as it only would help in batch mode, but then it may violate unique indexes
      *
-     * @return $this
      */
     public function storeRepositoryCache(string $class, array $fetchEager, string $indexProperty): static
     {
@@ -139,7 +137,7 @@ class EtlPipeline
     /**
      * @throws Exception|TransportExceptionInterface
      */
-    public function run(bool $batch_mode = false): bool
+    public function run(bool $batchMode = false): bool
     {
         if (!$this->output) {
             throw new EtlException('ETL output not set');
@@ -166,29 +164,36 @@ class EtlPipeline
         }
         $message = sprintf('Datu ielāde [%s] uzsākta', $this->pipelineId);
         $this->output->writeln($message);
-        $this->audit->audit(AuditService::CATEGORY_ETL_PIPELINE, $message);
+        $this->audit->audit(AuditCategoryEnum::ETLPipeline, $message);
 
         // EXTRACT -> TRANSFORM -> LOAD
         try {
-            if (!$batch_mode) {
+            $this->extractor->displayStartupMessage();
+            if (!$batchMode) {
                 $queue = $this->extractor->run();
                 if (null === $queue) {
                     throw new EtlException('Extractor must return Queue object in non-batch mode.');
                 }
+                $this->transformer->displayStartupMessage();
                 $queue = $this->transformer->run($queue);
+                $this->transformer->printValidatorFailures();
+                $this->loader->displayStartupMessage();
                 $this->loader->run($queue);
-            } else {
+            } else { // Batch mode
                 $this->extractor->run(function (Queue $queue) {
+                    $this->transformer->displayStartupMessage();
                     $queue = $this->transformer->run($queue);
+                    $this->transformer->printValidatorFailures();
+                    $this->loader->displayStartupMessage();
                     $this->loader->run($queue);
                 });
             }
             $this->notificationService->sendNotifications($this->output);
         } catch (Exception $exception) {
             $message = sprintf('<error>ETL [%s] neizdevās ar kļūdu: %s: %s</error>', $this->pipelineId, $exception::class, $exception->getMessage());
-            $this->output->writeln("\n".$message);
+            $this->output->writeln("\n" . $message);
             $this->output->writeln(sprintf('<error>%s:%s</error>', $exception->getFile(), $exception->getLine()));
-            $this->audit->audit(AuditService::CATEGORY_ETL_PIPELINE, $message, [
+            $this->audit->audit(AuditCategoryEnum::ETLPipeline, $message, [
                 'file' => $exception->getFile(),
                 'line' => $exception->getLine(),
                 'trace' => $exception->getTraceAsString(),
@@ -199,7 +204,7 @@ class EtlPipeline
 
         $message = sprintf('Datu ielāde [%s] pabeigta', $this->pipelineId);
         $this->output->writeln($message);
-        $this->audit->audit(AuditService::CATEGORY_ETL_PIPELINE, $message);
+        $this->audit->audit(AuditCategoryEnum::ETLPipeline, $message);
 
         return true;
     }
