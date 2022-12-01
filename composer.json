@@ -22,8 +22,8 @@
     "minimum-stability": "stable",
     "require": {
         "php": ">=8.1",
-        "symfony/dependency-injection": "^6.1",
-        "symfony/config": "^6.1"
+        "symfony/dependency-injection": "^6.1|^6.2",
+        "symfony/config": "^6.1|^6.2"
     },
     "extra": {
         "branch-alias": {
@@ -31,6 +31,6 @@
         }
     },
     "require-dev": {
-        "symfony/http-kernel": "^6.1"
+        "symfony/http-kernel": "^6.1|^6.2"
     }
 }
