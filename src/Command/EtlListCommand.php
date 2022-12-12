@@ -16,18 +16,19 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\Attribute\TaggedLocator;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use WhiteDigital\EtlBundle\Attribute\AsTask;
-use WhiteDigital\EtlBundle\Task\EtlTaskInterface;
 
 #[AsCommand(name: 'etl:list')]
 class EtlListCommand extends Command
 {
     public function __construct(
         #[TaggedLocator(tag: 'etl.task')] private readonly ServiceLocator $tasks,
-    )
-    {
+    ) {
         parent::__construct();
     }
 
+    /**
+     * @throws \ReflectionException
+     */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $output->writeln('<info>List of available ETL Tasks</info>');
@@ -36,14 +37,19 @@ class EtlListCommand extends Command
             ->setHeaders(['#', 'Name', 'FQCN']);
 
         $ix = 1;
-        /** @var EtlTaskInterface $task */
+        /** @var class-string $task */
         foreach ($this->tasks->getProvidedServices() as $task) {
             $reflection = new \ReflectionClass($task);
+            $asTaskAttributes = $reflection->getAttributes(AsTask::class);
+            if (1 !== count($asTaskAttributes)) {
+                throw new \RuntimeException('Single AsTask() attribute must be set for class '.$task);
+            }
             $asTaskAttribute = $reflection->getAttributes(AsTask::class)[0];
             $table->addRow([$ix++, $asTaskAttribute->getArguments()['name'], $task]);
         }
 
         $table->render();
+
         return Command::SUCCESS;
     }
 
@@ -52,5 +58,4 @@ class EtlListCommand extends Command
         $this
             ->setDescription('List available ETL Tasks');
     }
-
 }
