@@ -2,8 +2,6 @@
 
 namespace WhiteDigital\EtlBundle;
 
-use App\Enum\AuditCategoryEnum;
-use App\Service\AuditService;
 use Exception;
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -11,6 +9,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\Attribute\TaggedLocator;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use WhiteDigital\Audit\AuditBundle;
+use WhiteDigital\Audit\Contracts\AuditServiceInterface;
 use WhiteDigital\EtlBundle\Exception\EtlException;
 use WhiteDigital\EtlBundle\Extractor\ExtractorInterface;
 use WhiteDigital\EtlBundle\Helper\NotificationService;
@@ -28,10 +28,11 @@ class EtlPipeline
     private ?TransformerInterface $transformer = null;
     private ?LoaderInterface $loader = null;
 
+    /** @noinspection PhpInapplicableAttributeTargetDeclarationInspection */
     public function __construct(
         private readonly NotificationService                                     $notificationService,
         private readonly RepositoryCacheService                                  $repositoryCache,
-        private readonly AuditService                                            $audit,
+        private readonly AuditServiceInterface                                   $audit,
         #[TaggedLocator(tag: 'etl.extractor')] private readonly ServiceLocator   $extractors,
         #[TaggedLocator(tag: 'etl.transformer')] private readonly ServiceLocator $transformers,
         #[TaggedLocator(tag: 'etl.loader')] private readonly ServiceLocator      $loaders,
@@ -128,7 +129,7 @@ class EtlPipeline
      */
     public function storeRepositoryCache(string $class, array $fetchEager, string $indexProperty): static
     {
-        $this->output->writeln("Tiek iegūti esošie dati no {$class}");
+        $this->output->writeln("Tiek iegūti esošie dati no $class");
         $this->repositoryCache->storeExistingRecords($class, $fetchEager, $indexProperty);
 
         return $this;
@@ -164,7 +165,7 @@ class EtlPipeline
         }
         $message = sprintf('Datu ielāde [%s] uzsākta', $this->pipelineId);
         $this->output->writeln($message);
-        $this->audit->audit(AuditCategoryEnum::ETLPipeline, $message);
+        $this->audit->audit(AuditBundle::ETL, $message);
 
         // EXTRACT -> TRANSFORM -> LOAD
         try {
@@ -193,7 +194,7 @@ class EtlPipeline
             $message = sprintf('<error>ETL [%s] neizdevās ar kļūdu: %s: %s</error>', $this->pipelineId, $exception::class, $exception->getMessage());
             $this->output->writeln("\n" . $message);
             $this->output->writeln(sprintf('<error>%s:%s</error>', $exception->getFile(), $exception->getLine()));
-            $this->audit->audit(AuditCategoryEnum::ETLPipeline, $message, [
+            $this->audit->audit(AuditBundle::ETL, $message, [
                 'file' => $exception->getFile(),
                 'line' => $exception->getLine(),
                 'trace' => $exception->getTraceAsString(),
@@ -204,7 +205,7 @@ class EtlPipeline
 
         $message = sprintf('Datu ielāde [%s] pabeigta', $this->pipelineId);
         $this->output->writeln($message);
-        $this->audit->audit(AuditCategoryEnum::ETLPipeline, $message);
+        $this->audit->audit(AuditBundle::ETL, $message);
 
         return true;
     }

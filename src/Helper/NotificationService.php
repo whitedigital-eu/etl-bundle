@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace WhiteDigital\EtlBundle\Helper;
 
-use App\Service\AuditService;
-use http\Exception\RuntimeException;
+use RuntimeException;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\PropertyAccess\PropertyAccess;
 use Symfony\Component\Security\Core\Security;
+use WhiteDigital\Audit\AuditBundle;
+use WhiteDigital\Audit\Contracts\AuditServiceInterface;
 
 final class NotificationService
 {
@@ -20,7 +21,7 @@ final class NotificationService
 
     public function __construct(
         private readonly MailerInterface $mailer,
-        private readonly AuditService $audit,
+        private readonly AuditServiceInterface $audit,
         private readonly Security $security,
     ) {
     }
@@ -49,7 +50,7 @@ final class NotificationService
 
         $this->mailer->send($email);
         $output->writeln("E-pasta ziņojums nosūtīts adresātam {$currentEmail}");
-        $this->audit->audit(AuditService::CATEGORY_ETL_NOTIFICATIONS, "Notifications sent to $currentEmail", ['notification' => $notificationData]);
+        $this->audit->audit(AuditBundle::ETL, "Notifications sent to $currentEmail", ['notification' => $notificationData]);
     }
 
     public function addNotificationContext(string $context): void
