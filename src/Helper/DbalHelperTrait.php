@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace WhiteDigital\EtlBundle\Helper;
 
-use DateTime;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\DBAL\Statement;
+use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\Persistence\ManagerRegistry;
 use RuntimeException;
@@ -22,7 +22,6 @@ use WhiteDigital\EtlBundle\Exception\EtlException;
 trait DbalHelperTrait
 {
     private ManagerRegistry $doctrine;
-
 
     #[Required]
     public function setDoctrine(ManagerRegistry $doctrine): void
@@ -53,9 +52,6 @@ trait DbalHelperTrait
     }
 
     /**
-     * @param string $table
-     * @param array|object $data
-     * @param int $id
      * @throws EtlException
      * @throws Exception
      */
@@ -71,7 +67,7 @@ trait DbalHelperTrait
     protected function createDBALInsertQuery(string $table, array|object $data, bool $addCreated = true): QueryBuilder
     {
         /**
-         * @var Connection $connection
+         * @var Connection   $connection
          * @var QueryBuilder $query
          */
         $connection = $this->doctrine->getConnection();
@@ -81,11 +77,11 @@ trait DbalHelperTrait
         foreach ($data as $col => $val) {
             $queryBuilder
                 ->setParameter($this->toColumnName($col), $val)
-                ->setValue($this->toColumnName($col), ':' . $this->toColumnName($col));
+                ->setValue($this->toColumnName($col), ':'.$this->toColumnName($col));
         }
         if ($addCreated) {
             $queryBuilder->setValue('created_at', ':created_at')
-                ->setParameter('created_at', (new DateTime())->format('Y-m-d H:i:s'));
+                ->setParameter('created_at', (new \DateTime())->format('Y-m-d H:i:s'));
         }
 
         return $queryBuilder;
@@ -94,7 +90,7 @@ trait DbalHelperTrait
     protected function createDBALInsertQueryFromEntity(BaseEntity $entity, bool $addCreated = true): QueryBuilder
     {
         /**
-         * @var Connection $connection
+         * @var Connection   $connection
          * @var QueryBuilder $query
          */
         $connection = $this->doctrine->getConnection();
@@ -102,7 +98,7 @@ trait DbalHelperTrait
 
         $table = $this->getTableName($entity::class);
 
-        /** @var \Doctrine\ORM\Mapping\ClassMetadata $entityMetaData */
+        /** @var ClassMetadata $entityMetaData */
         $entityMetaData = $this->doctrine->getManager()->getClassMetadata($entity::class);
 
         $queryBuilder->insert($table);
@@ -111,7 +107,6 @@ trait DbalHelperTrait
         $fieldNames = $entityMetaData->getFieldNames();
         $associationMappings = $entityMetaData->getAssociationMappings();
 
-
         foreach ($reflection->getProperties() as $property) {
             $propertyName = $property->getName();
 
@@ -119,20 +114,20 @@ trait DbalHelperTrait
             if (in_array($propertyName, $fieldNames, true) && (null !== $value = $property->getValue($entity))) {
                 $columnName = $entityMetaData->getColumnName($propertyName);
                 $queryBuilder
-                    ->setValue($columnName, ':' . $columnName)
+                    ->setValue($columnName, ':'.$columnName)
                     ->setParameter($columnName, $value);
                 continue;
             }
             // process associations
             if (array_key_exists($propertyName, $associationMappings) && (null !== $value = $property->getValue($entity))) {
                 if ($value instanceof ArrayCollection) {
-                    //TODO how to proceed with many to many associations?
+                    // TODO how to proceed with many to many associations?
                     continue;
                 }
                 if (1 === count($joinColumn = $associationMappings[$propertyName]['joinColumnFieldNames'])) {
                     $columnName = current($joinColumn);
                     $queryBuilder
-                        ->setValue($columnName, ':' . $columnName)
+                        ->setValue($columnName, ':'.$columnName)
                         ->setParameter($columnName, $value->getId());
                     continue;
                 } else {
@@ -144,28 +139,26 @@ trait DbalHelperTrait
 
         if ($addCreated) {
             $queryBuilder->setValue('created_at', ':created_at')
-                ->setParameter('created_at', (new DateTime())->format('Y-m-d H:i:s'));
+                ->setParameter('created_at', (new \DateTime())->format('Y-m-d H:i:s'));
         }
 
         return $queryBuilder;
     }
 
-
     /**
-     * Will return null, if nothing to update, QueryBuilder otherwise
-     * @param BaseEntity $existingEntity
-     * @param BaseEntity $newEntity
-     * @return QueryBuilder|null
+     * Will return null, if nothing to update, QueryBuilder otherwise.
+     * ReplaceExisting=true will replace only scalar values for now.
+     *
      * @throws EtlException
      */
-    protected function createDBALUpdateQueryFromEntity(BaseEntity $existingEntity, BaseEntity $newEntity): ?QueryBuilder
+    protected function createDBALUpdateQueryFromEntity(BaseEntity $existingEntity, BaseEntity $newEntity, bool $replaceExisting = false): ?QueryBuilder
     {
         if (get_class($existingEntity) !== get_class($newEntity)) {
             throw new EtlException('createDBALUpdateQueryFromEntity must receive objects from same class.');
         }
         $hasChanges = false;
         /**
-         * @var Connection $connection
+         * @var Connection   $connection
          * @var QueryBuilder $query
          */
         $connection = $this->doctrine->getConnection();
@@ -173,7 +166,7 @@ trait DbalHelperTrait
 
         $table = $this->getTableName($existingEntity::class);
 
-        /** @var \Doctrine\ORM\Mapping\ClassMetadata $entityMetaData */
+        /** @var ClassMetadata $entityMetaData */
         $entityMetaData = $this->doctrine->getManager()->getClassMetadata($existingEntity::class);
 
         $queryBuilder->update($table);
@@ -182,18 +175,17 @@ trait DbalHelperTrait
         $fieldNames = $entityMetaData->getFieldNames();
         $associationMappings = $entityMetaData->getAssociationMappings();
 
-
         foreach ($reflection->getProperties() as $property) {
             $propertyName = $property->getName();
 
             // process scalar types
             if (in_array($propertyName, $fieldNames, true)
-                && (null === $property->getValue($existingEntity))
                 && (null !== $value = $property->getValue($newEntity))
+                && (null === $property->getValue($existingEntity) || ($replaceExisting && $property->getValue($existingEntity) !== $property->getValue($newEntity)))
             ) {
                 $columnName = $entityMetaData->getColumnName($propertyName);
                 $queryBuilder
-                    ->set($columnName, ':' . $columnName)
+                    ->set($columnName, ':'.$columnName)
                     ->setParameter($columnName, $value);
                 $hasChanges = true;
                 continue;
@@ -204,13 +196,13 @@ trait DbalHelperTrait
                 && (null !== $value = $property->getValue($newEntity))
             ) {
                 if ($value instanceof ArrayCollection) {
-                    //TODO how to proceed with many to many associations?
+                    // TODO how to proceed with many to many associations?
                     continue;
                 }
                 if (1 === count($joinColumn = $associationMappings[$propertyName]['joinColumnFieldNames'])) {
                     $columnName = current($joinColumn);
                     $queryBuilder
-                        ->set($columnName, ':' . $columnName)
+                        ->set($columnName, ':'.$columnName)
                         ->setParameter($columnName, $value->getId());
                     $hasChanges = true;
                     continue;
@@ -230,7 +222,7 @@ trait DbalHelperTrait
             ->setParameter('id', $existingEntity->getId());
         // always set Updated
         $queryBuilder->set('updated_at', ':updated_at')
-            ->setParameter('updated_at', (new DateTime())->format('Y-m-d H:i:s'));
+            ->setParameter('updated_at', (new \DateTime())->format('Y-m-d H:i:s'));
 
         return $queryBuilder;
     }
