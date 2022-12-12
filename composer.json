@@ -8,22 +8,37 @@
             "WhiteDigital\\EtlBundle\\": "src/"
         }
     },
-    "autoload-dev": {
-        "psr-4": {
-            "WhiteDigital\\Tests\\": "tests/"
-        }
-    },
     "authors": [
         {
             "name": "Andis Cirulis",
             "email": "andis.cirulis@whitedigital.eu"
+        },
+        {
+            "name": "Davis Zalitis",
+            "email": "davis.zalitis@whitedigital.eu"
         }
     ],
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
+    "prefer-stable": true,
     "require": {
         "php": ">=8.1",
-        "symfony/dependency-injection": "^6.1|^6.2",
-        "symfony/config": "^6.1|^6.2"
+        "doctrine/collections": "*",
+        "doctrine/dbal": "*",
+        "doctrine/orm": "*",
+        "doctrine/persistence": "*",
+        "jetbrains/phpstorm-attributes": "*",
+        "psr/container": "*",
+        "symfony/config": ">=6.1",
+        "symfony/console": ">=6.1",
+        "symfony/dependency-injection": ">=6.1",
+        "symfony/http-kernel": ">=6.1",
+        "symfony/mailer": ">=6.1",
+        "symfony/property-access": ">=6.1",
+        "symfony/security-bundle": ">=6.1",
+        "symfony/service-contracts": "*",
+        "symfony/twig-bridge": ">=6.1",
+        "whitedigital-eu/audit-service": "*",
+        "whitedigital-eu/entity-resource-mapper-bundle": "*"
     },
     "extra": {
         "branch-alias": {
@@ -31,6 +46,6 @@
         }
     },
     "require-dev": {
-        "symfony/http-kernel": "^6.1|^6.2"
+        "whitedigital-eu/config-pack": "*"
     }
 }

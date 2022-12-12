@@ -4,7 +4,7 @@
  * @author andis @ 22.11.2022
  */
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace WhiteDigital\EtlBundle;
 
@@ -14,9 +14,12 @@ use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 
 class EtlBundle extends AbstractBundle
 {
+    public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
+    {
+        $container->import('../config/services.php');
 
- public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
- {
-     $container->import('../config/services.php');
- }
+        if (false === ($builder->getExtensionConfig('audit')[0]['enabled'] ?? false)) {
+            $container->import('../config/void_audit.php');
+        }
+    }
 }

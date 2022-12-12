@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace WhiteDigital\EtlBundle\Loader;
 
-use App\Enum\AuditCategoryEnum;
-use App\Service\AuditService;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Exception;
+use WhiteDigital\Audit\AuditBundle;
+use WhiteDigital\Audit\Contracts\AuditServiceInterface;
 use WhiteDigital\EtlBundle\Command\Output\WebProgressBar;
 use WhiteDigital\EtlBundle\Exception\LoaderException;
 use WhiteDigital\EtlBundle\Helper\CallbackQuery;
@@ -23,7 +23,7 @@ use WhiteDigital\EtlBundle\Helper\Queue;
 class DoctrineDbalLoader extends AbstractLoader
 {
     public function __construct(
-        private readonly AuditService    $audit,
+        private readonly AuditServiceInterface    $audit,
         private readonly ManagerRegistry $doctrine,
     )
     {
@@ -83,7 +83,7 @@ class DoctrineDbalLoader extends AbstractLoader
             $this->output->writeln(sprintf("\nDatu bāzes vaicājumi pabeigti ar %s INSERT and %s UPDATE operācijām.\n", $numberInserts, $numberUpdates));
             $connection->commit();
             if ($numberInserts > 0 || $numberUpdates > 0) {
-                $this->audit->audit(AuditCategoryEnum::ETLPipeline, sprintf('Loader query log with %s INSERTs and %s UPDATEs', $numberInserts, $numberUpdates), $queryLog);
+                $this->audit->audit(AuditBundle::ETL, sprintf('Loader query log with %s INSERTs and %s UPDATEs', $numberInserts, $numberUpdates), $queryLog);
             }
         } catch (Exception $exception) {
             $connection->rollBack();
