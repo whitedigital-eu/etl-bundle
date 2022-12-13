@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WhiteDigital\EtlBundle\Helper;
 
+use DateTimeInterface;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
@@ -113,6 +114,9 @@ trait DbalHelperTrait
             // process scalar types
             if (in_array($propertyName, $fieldNames, true) && (null !== $value = $property->getValue($entity))) {
                 $columnName = $entityMetaData->getColumnName($propertyName);
+                if ($value instanceof DateTimeInterface) {
+                    $value = $value->format(DateTimeInterface::RFC3339);
+                }
                 $queryBuilder
                     ->setValue($columnName, ':'.$columnName)
                     ->setParameter($columnName, $value);
@@ -139,7 +143,7 @@ trait DbalHelperTrait
 
         if ($addCreated) {
             $queryBuilder->setValue('created_at', ':created_at')
-                ->setParameter('created_at', (new \DateTime())->format('Y-m-d H:i:s'));
+                ->setParameter('created_at', (new \DateTime())->format(DateTimeInterface::RFC3339));
         }
 
         return $queryBuilder;
@@ -184,6 +188,9 @@ trait DbalHelperTrait
                 && (null === $property->getValue($existingEntity) || ($replaceExisting && $property->getValue($existingEntity) !== $property->getValue($newEntity)))
             ) {
                 $columnName = $entityMetaData->getColumnName($propertyName);
+                if ($value instanceof DateTimeInterface) {
+                    $value = $value->format(DateTimeInterface::RFC3339);
+                }
                 $queryBuilder
                     ->set($columnName, ':'.$columnName)
                     ->setParameter($columnName, $value);
@@ -222,7 +229,7 @@ trait DbalHelperTrait
             ->setParameter('id', $existingEntity->getId());
         // always set Updated
         $queryBuilder->set('updated_at', ':updated_at')
-            ->setParameter('updated_at', (new \DateTime())->format('Y-m-d H:i:s'));
+            ->setParameter('updated_at', (new \DateTime())->format(DateTimeInterface::RFC3339));
 
         return $queryBuilder;
     }
@@ -281,7 +288,7 @@ trait DbalHelperTrait
     {
         $data = $this->normalizeData($data);
         if ($addCreated) {
-            $data['created_at'] = (new \DateTime())->format('Y-m-d H:i:s');
+            $data['created_at'] = (new \DateTime())->format(DateTimeInterface::RFC3339);
         }
         /** @var Connection $connection */
         $connection = $this->doctrine->getConnection();
@@ -304,7 +311,7 @@ trait DbalHelperTrait
     {
         $data = $this->normalizeData($data);
         if ($addCreated) {
-            $data['created_at'] = (new \DateTime())->format('Y-m-d H:i:s');
+            $data['created_at'] = (new \DateTime())->format(DateTimeInterface::RFC3339);
         }
         /** @var Connection $connection */
         $connection = $this->doctrine->getConnection();
