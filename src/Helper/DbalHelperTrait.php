@@ -143,7 +143,7 @@ trait DbalHelperTrait
 
         if ($addCreated) {
             $queryBuilder->setValue('created_at', ':created_at')
-                ->setParameter('created_at', (new \DateTime())->format('Y-m-d H:i:s'));
+                ->setParameter('created_at', (new \DateTime())->format(DateTimeInterface::RFC3339));
         }
 
         return $queryBuilder;
@@ -229,7 +229,7 @@ trait DbalHelperTrait
             ->setParameter('id', $existingEntity->getId());
         // always set Updated
         $queryBuilder->set('updated_at', ':updated_at')
-            ->setParameter('updated_at', (new \DateTime())->format('Y-m-d H:i:s'));
+            ->setParameter('updated_at', (new \DateTime())->format(DateTimeInterface::RFC3339));
 
         return $queryBuilder;
     }
@@ -288,7 +288,7 @@ trait DbalHelperTrait
     {
         $data = $this->normalizeData($data);
         if ($addCreated) {
-            $data['created_at'] = (new \DateTime())->format('Y-m-d H:i:s');
+            $data['created_at'] = (new \DateTime())->format(DateTimeInterface::RFC3339);
         }
         /** @var Connection $connection */
         $connection = $this->doctrine->getConnection();
@@ -311,7 +311,7 @@ trait DbalHelperTrait
     {
         $data = $this->normalizeData($data);
         if ($addCreated) {
-            $data['created_at'] = (new \DateTime())->format('Y-m-d H:i:s');
+            $data['created_at'] = (new \DateTime())->format(DateTimeInterface::RFC3339);
         }
         /** @var Connection $connection */
         $connection = $this->doctrine->getConnection();

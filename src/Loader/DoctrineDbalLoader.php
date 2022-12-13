@@ -59,8 +59,6 @@ class DoctrineDbalLoader extends AbstractLoader
                     try {
                         $record->executeQuery();
                     } catch (Error $error) {
-                        $this->audit->auditException($error);
-
                         throw new LoaderException($error->getMessage(), previous: $error);
                     }
 
