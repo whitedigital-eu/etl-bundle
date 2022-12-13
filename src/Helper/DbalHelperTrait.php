@@ -188,6 +188,9 @@ trait DbalHelperTrait
                 && (null === $property->getValue($existingEntity) || ($replaceExisting && $property->getValue($existingEntity) !== $property->getValue($newEntity)))
             ) {
                 $columnName = $entityMetaData->getColumnName($propertyName);
+                if ($value instanceof DateTimeInterface) {
+                    $value = $value->format(DateTimeInterface::RFC3339);
+                }
                 $queryBuilder
                     ->set($columnName, ':'.$columnName)
                     ->setParameter($columnName, $value);
