@@ -7,6 +7,7 @@ namespace WhiteDigital\EtlBundle\Loader;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
+use Error;
 use Exception;
 use WhiteDigital\Audit\AuditBundle;
 use WhiteDigital\Audit\Contracts\AuditServiceInterface;
@@ -54,7 +55,14 @@ class DoctrineDbalLoader extends AbstractLoader
             $progressBar->start();
             while ($record = $data->pop()) {
                 if ($record instanceof QueryBuilder) { // Insert or Update Query
-                    $record->executeQuery();
+
+                    try {
+                        $record->executeQuery();
+                    } catch (Error $error) {
+                        $this->audit->auditException($error);
+
+                        throw new LoaderException($error->getMessage(), previous: $error);
+                    }
 
                     if (QueryBuilder::INSERT === $record->getType()) {
                         ++$numberInserts;
