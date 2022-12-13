@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WhiteDigital\EtlBundle\Helper;
 
+use DateTimeInterface;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
@@ -113,6 +114,9 @@ trait DbalHelperTrait
             // process scalar types
             if (in_array($propertyName, $fieldNames, true) && (null !== $value = $property->getValue($entity))) {
                 $columnName = $entityMetaData->getColumnName($propertyName);
+                if ($value instanceof DateTimeInterface) {
+                    $value = $value->format(DateTimeInterface::RFC3339);
+                }
                 $queryBuilder
                     ->setValue($columnName, ':'.$columnName)
                     ->setParameter($columnName, $value);
