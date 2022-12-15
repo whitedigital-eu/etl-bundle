@@ -7,11 +7,11 @@ use WhiteDigital\Audit\Contracts\AuditServiceInterface;
 
 class AuditVoidService implements AuditServiceInterface
 {
-    public function audit(string $type, string $message, array $data = []): void
+    public function audit(string $type, string $message, array $data = [], string $class = ''): void
     {
     }
 
-    public function auditException(Throwable $exception, ?string $url = null): void
+    public function auditException(Throwable $exception, ?string $url = null, string $class = ''): void
     {
     }
 }
