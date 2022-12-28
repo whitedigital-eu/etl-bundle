@@ -21,6 +21,7 @@ use WhiteDigital\EtlBundle\Task\EtlTaskRunner;
 class ETlRunCommand extends Command
 {
     private const ETL_PIPELINE_ID = 'etl_pipeline_id';
+    private const ETL_CUSTOM_ARG = 'path_arg';
 
     public function __construct(
         private readonly EtlTaskRunner $etlTaskRunner,
@@ -37,6 +38,9 @@ class ETlRunCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $output->writeln('<info>ETL task runner started. You can see available tasks by etl:list command.</info>');
+        if ($customArg = $input->getArgument(self::ETL_CUSTOM_ARG)) {
+            $this->etlTaskRunner->addCustomArg('path', $customArg);
+        }
         $this->etlTaskRunner->runTaskByName($output, name: $input->getArgument(self::ETL_PIPELINE_ID));
         return Command::SUCCESS;
     }
@@ -45,8 +49,8 @@ class ETlRunCommand extends Command
     {
         $this
             ->addArgument(self::ETL_PIPELINE_ID, InputArgument::REQUIRED, 'ID of ETL Pipeline')
+            ->addArgument(self::ETL_CUSTOM_ARG, InputArgument::OPTIONAL, 'Optional argument "path" for Extractor')
             ->setDescription('ETL pipeline runner')
             ->setHelp('Runs predefined Extract/Transform/Load pipelines');
     }
-
 }
