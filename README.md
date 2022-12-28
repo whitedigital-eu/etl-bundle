@@ -15,15 +15,6 @@ Tasks can be run:
 2. Symfony 6.1+  
 
 ## Install bundle
-1. Add custom repo to the composer.json  
-```yaml
-    {
-      "type": "vcs",
-      "url": "https://github.com/whitedigital-eu/etl-bundle.git",
-      "no-api": true
-    }
-```
-2. Install bundle  
 ```bash 
 composer req "whitedigital-eu/etl-bundle"
 ```
@@ -53,11 +44,11 @@ class HorizonCustomerImportTask extends AbstractTask
      * @throws EtlException
      * @throws TransportExceptionInterface
      */
-    public function runTask(OutputInterface $output): void
+    public function runTask(OutputInterface $output, array $extractorArgs = null): void
     {
         $this->etlPipeline
             ->setOutput($output)
-            ->addExtractor(HorizonDataExtractor::class, ['path' => '/rest/TDdmNorSar/query?columns=K.KODS,K.NOSAUK&orderby=K.NOSAUK asc'])
+            ->addExtractor(HorizonDataExtractor::class, $extractorArgs ?? ['path' => '/rest/TDdmNorSar/query?columns=K.KODS,K.NOSAUK&orderby=K.NOSAUK asc'])
             ->addTransformer(HorizonCustomerTransformer::class)
             ->addLoader(DoctrineDbalLoader::class)
             ->run();
@@ -135,6 +126,11 @@ Example Loader:
 ```bash
 bin/console etl:run horizon_customer_import
 ```
+or pass extra custom argument:
+```bash
+bin/console etl:run horizon_customer_import random_path.txt
+```
+
 2. List available tasks:
 ```bash
 bin/console etl:list
