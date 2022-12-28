@@ -44,6 +44,7 @@ trait DbalHelperTrait
     }
 
     /**
+     * @deprecated
      * @throws Exception
      */
     protected function executeDBALInsertQuery(string $table, array|object $data, bool $addCreated = true): void
@@ -53,6 +54,7 @@ trait DbalHelperTrait
     }
 
     /**
+     * @deprecated
      * @throws EtlException
      * @throws Exception
      */
@@ -116,6 +118,9 @@ trait DbalHelperTrait
                 $columnName = $entityMetaData->getColumnName($propertyName);
                 if ($value instanceof DateTimeInterface) {
                     $value = $value->format(DateTimeInterface::RFC3339);
+                }
+                if ($value instanceof \BackedEnum) {
+                    $value = $value->value;
                 }
                 $queryBuilder
                     ->setValue($columnName, ':'.$columnName)
@@ -190,6 +195,9 @@ trait DbalHelperTrait
                 $columnName = $entityMetaData->getColumnName($propertyName);
                 if ($value instanceof DateTimeInterface) {
                     $value = $value->format(DateTimeInterface::RFC3339);
+                }
+                if ($value instanceof \BackedEnum) {
+                    $value = $value->value;
                 }
                 $queryBuilder
                     ->set($columnName, ':'.$columnName)
