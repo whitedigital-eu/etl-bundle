@@ -10,7 +10,7 @@ use Doctrine\Persistence\ManagerRegistry;
 use Error;
 use Exception;
 use WhiteDigital\Audit\AuditBundle;
-use WhiteDigital\Audit\Contracts\AuditServiceInterface;
+use WhiteDigital\Audit\Service\AuditServiceLocator;
 use WhiteDigital\EtlBundle\Command\Output\WebProgressBar;
 use WhiteDigital\EtlBundle\Exception\LoaderException;
 use WhiteDigital\EtlBundle\Helper\CallbackQuery;
@@ -24,10 +24,9 @@ use WhiteDigital\EtlBundle\Helper\Queue;
 class DoctrineDbalLoader extends AbstractLoader
 {
     public function __construct(
-        private readonly AuditServiceInterface    $audit,
+        private readonly AuditServiceLocator $audit,
         private readonly ManagerRegistry $doctrine,
-    )
-    {
+    ) {
     }
 
     /**

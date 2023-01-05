@@ -12,7 +12,7 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\PropertyAccess\PropertyAccess;
 use Symfony\Component\Security\Core\Security;
 use WhiteDigital\Audit\AuditBundle;
-use WhiteDigital\Audit\Contracts\AuditServiceInterface;
+use WhiteDigital\Audit\Service\AuditServiceLocator;
 
 final class NotificationService
 {
@@ -21,7 +21,7 @@ final class NotificationService
 
     public function __construct(
         private readonly MailerInterface $mailer,
-        private readonly AuditServiceInterface $audit,
+        private readonly AuditServiceLocator $audit,
         private readonly Security $security,
     ) {
     }

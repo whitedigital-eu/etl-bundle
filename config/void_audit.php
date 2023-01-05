@@ -10,6 +10,7 @@ use WhiteDigital\EtlBundle\Service\AuditVoidService;
 return static function (ContainerConfigurator $container): void {
     $container
         ->services()
-            ->set(AuditServiceInterface::class)
-            ->class(AuditVoidService::class);
+            ->set('whitedigital.etl.service.audit_void')
+            ->class(AuditVoidService::class)
+            ->tag('whitedigital.audit', ['priority' => 0, ], );
 };
