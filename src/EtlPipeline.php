@@ -11,6 +11,7 @@ use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use WhiteDigital\Audit\AuditBundle;
 use WhiteDigital\Audit\Contracts\AuditServiceInterface;
+use WhiteDigital\Audit\Service\AuditServiceLocator;
 use WhiteDigital\EtlBundle\Exception\EtlException;
 use WhiteDigital\EtlBundle\Extractor\ExtractorInterface;
 use WhiteDigital\EtlBundle\Helper\NotificationService;
@@ -32,7 +33,7 @@ class EtlPipeline
     public function __construct(
         private readonly NotificationService                                     $notificationService,
         private readonly RepositoryCacheService                                  $repositoryCache,
-        private readonly AuditServiceInterface                                   $audit,
+        private readonly AuditServiceLocator                                     $audit,
         #[TaggedLocator(tag: 'etl.extractor')] private readonly ServiceLocator   $extractors,
         #[TaggedLocator(tag: 'etl.transformer')] private readonly ServiceLocator $transformers,
         #[TaggedLocator(tag: 'etl.loader')] private readonly ServiceLocator      $loaders,
