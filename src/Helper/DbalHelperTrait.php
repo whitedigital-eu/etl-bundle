@@ -96,6 +96,9 @@ trait DbalHelperTrait
      */
     protected function createDBALDeleteQuery(string $entity, array $conditions): QueryBuilder
     {
+        if (empty($conditions)) {
+            throw new \RuntimeException('No conditions given DBAL for delete query');
+        }
         $connection = $this->doctrine->getConnection();
         $queryBuilder = $connection->createQueryBuilder();
 
@@ -175,6 +178,42 @@ trait DbalHelperTrait
     }
 
     /**
+     * Special case of update query, explicitly setting given fields to null.
+     * @param class-string $entity
+     * @param string[] $nullableFields
+     * @return QueryBuilder
+     */
+    protected function createDBALUpdateQuerySetNull(string $entity, mixed $id, array $nullableFields): ?QueryBuilder
+    {
+        if (empty($nullableFields) || empty($id)) {
+            return null;
+        }
+        /**
+         * @var Connection   $connection
+         * @var QueryBuilder $query
+         */
+        $connection = $this->doctrine->getConnection();
+        $queryBuilder = $connection->createQueryBuilder();
+
+        $queryBuilder->update($this->getTableName($entity));
+
+        foreach ($nullableFields as $field) {
+            $queryBuilder->set(sprintf('%s', $this->toColumnName($field)), 'NULL');
+        }
+
+        // Set condition
+        $queryBuilder->where('id = :id')
+            ->setParameter('id', $id);
+        // Always set Updated
+        $queryBuilder->set('updated_at', ':updated_at')
+            ->setParameter('updated_at', (new \DateTimeImmutable())->format(DateTimeInterface::RFC3339));
+
+        return $queryBuilder;
+
+    }
+
+
+    /**
      * Will return null, if nothing to update, QueryBuilder otherwise.
      * ReplaceExisting=true will replace only scalar values for now.
      *
@@ -209,8 +248,8 @@ trait DbalHelperTrait
 
             // process scalar types
             if (in_array($propertyName, $fieldNames, true)
-                && (null !== $value = $property->getValue($newEntity))
-                && (null === $property->getValue($existingEntity) || ($replaceExisting && $property->getValue($existingEntity) !== $property->getValue($newEntity)))
+                && (null !== $value = $property->getValue($newEntity)) // new value is not NULL
+                && (null === $property->getValue($existingEntity) || ($replaceExisting && $property->getValue($existingEntity) !== $property->getValue($newEntity))) // existing value is NULL OR we allow to replace existing value explicitly
             ) {
                 $columnName = $entityMetaData->getColumnName($propertyName);
                 if ($value instanceof DateTimeInterface) {
@@ -257,7 +296,7 @@ trait DbalHelperTrait
             ->setParameter('id', $existingEntity->getId());
         // always set Updated
         $queryBuilder->set('updated_at', ':updated_at')
-            ->setParameter('updated_at', (new \DateTime())->format(DateTimeInterface::RFC3339));
+            ->setParameter('updated_at', (new \DateTimeImmutable())->format(DateTimeInterface::RFC3339));
 
         return $queryBuilder;
     }
