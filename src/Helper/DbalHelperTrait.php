@@ -90,6 +90,26 @@ trait DbalHelperTrait
         return $queryBuilder;
     }
 
+    /**
+     * @param class-string $entity
+     * @param string[] $conditions
+     */
+    protected function createDBALDeleteQuery(string $entity, array $conditions): QueryBuilder
+    {
+        $connection = $this->doctrine->getConnection();
+        $queryBuilder = $connection->createQueryBuilder();
+
+        $queryBuilder->delete($this->getTableName($entity), 't');
+        foreach ($conditions as $property => $value) {
+            $column = $this->toColumnName($property);
+            $queryBuilder
+                ->andWhere(sprintf('t.%s = :%s', $column, $column))
+                ->setParameter($column, $value);
+        }
+
+        return $queryBuilder;
+    }
+
     protected function createDBALInsertQueryFromEntity(BaseEntity $entity, bool $addCreated = true): QueryBuilder
     {
         /**

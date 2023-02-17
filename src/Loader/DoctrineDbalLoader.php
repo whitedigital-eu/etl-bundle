@@ -7,9 +7,8 @@ namespace WhiteDigital\EtlBundle\Loader;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
-use Error;
-use Exception;
 use WhiteDigital\Audit\AuditBundle;
+use WhiteDigital\Audit\Contracts\AuditType;
 use WhiteDigital\Audit\Service\AuditServiceLocator;
 use WhiteDigital\EtlBundle\Command\Output\WebProgressBar;
 use WhiteDigital\EtlBundle\Exception\LoaderException;
@@ -45,6 +44,7 @@ class DoctrineDbalLoader extends AbstractLoader
         $queryLog = [];
         $numberUpdates = 0;
         $numberInserts = 0;
+        $numberDeletes = 0;
         /** @var Connection $connection */
         $connection = $this->doctrine->getConnection();
         $connection->beginTransaction();
@@ -54,10 +54,9 @@ class DoctrineDbalLoader extends AbstractLoader
             $progressBar->start();
             while ($record = $data->pop()) {
                 if ($record instanceof QueryBuilder) { // Insert or Update Query
-
                     try {
                         $record->executeQuery();
-                    } catch (Error $error) {
+                    } catch (\Error $error) {
                         throw new LoaderException($error->getMessage(), previous: $error);
                     }
 
@@ -65,17 +64,21 @@ class DoctrineDbalLoader extends AbstractLoader
                         ++$numberInserts;
                     } elseif (QueryBuilder::UPDATE === $record->getType()) {
                         ++$numberUpdates;
+                    } elseif (QueryBuilder::DELETE === $record->getType()) {
+                        ++$numberDeletes;
                     } else {
                         throw new LoaderException(sprintf('Unsupported query type (%s) received.', $record->getType()));
                     }
                     $queryLog[] = ['q' => match ($record->getType()) {
                         QueryBuilder::INSERT => 'Insert',
-                        QueryBuilder::UPDATE => 'Update'
+                        QueryBuilder::UPDATE => 'Update',
+                        QueryBuilder::DELETE => 'Delete'
                     }, 'p' => $record->getParameters()];
                 } elseif ($record instanceof CallbackQuery) { // Callback
                     $statistics = $record->execute();
                     $numberInserts += $statistics['insert'];
                     $numberUpdates += $statistics['update'];
+                    $numberDeletes += $statistics['delete'];
                     if (!empty($log = $statistics['log'])) {
                         $queryLog[] = $log;
                     }
@@ -85,12 +88,12 @@ class DoctrineDbalLoader extends AbstractLoader
                 $progressBar->advance();
             }
             $progressBar->finish();
-            $this->output->writeln(sprintf("\nDatu bāzes vaicājumi pabeigti ar %s INSERT and %s UPDATE operācijām.\n", $numberInserts, $numberUpdates));
+            $this->output->writeln(sprintf("\nDatu bāzes vaicājumi pabeigti ar %s INSERT, %s UPDATE and %s DELETE operācijām.\n", $numberInserts, $numberUpdates, $numberDeletes));
             $connection->commit();
             if ($numberInserts > 0 || $numberUpdates > 0) {
-                $this->audit->audit(AuditBundle::ETL, sprintf('Loader query log with %s INSERTs and %s UPDATEs', $numberInserts, $numberUpdates), $queryLog);
+                $this->audit->audit(AuditType::ETL, sprintf('Loader query log with %s INSERTs, %s UPDATEs and %s DELETEs', $numberInserts, $numberUpdates, $numberDeletes), $queryLog);
             }
-        } catch (Exception $exception) {
+        } catch (\Exception $exception) {
             $connection->rollBack();
             throw $exception;
         }
