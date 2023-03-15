@@ -1,4 +1,4 @@
-<?php
+<?php declare(strict_types = 1);
 
 namespace WhiteDigital\EtlBundle;
 
@@ -9,9 +9,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\Attribute\TaggedLocator;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
-use WhiteDigital\Audit\AuditBundle;
 use WhiteDigital\Audit\Contracts\AuditServiceInterface;
-use WhiteDigital\Audit\Service\AuditServiceLocator;
+use WhiteDigital\Audit\Contracts\AuditType;
 use WhiteDigital\EtlBundle\Exception\EtlException;
 use WhiteDigital\EtlBundle\Extractor\ExtractorInterface;
 use WhiteDigital\EtlBundle\Helper\NotificationService;
@@ -33,7 +32,7 @@ class EtlPipeline
     public function __construct(
         private readonly NotificationService                                     $notificationService,
         private readonly RepositoryCacheService                                  $repositoryCache,
-        private readonly AuditServiceLocator                                     $audit,
+        private readonly AuditServiceInterface                                   $audit,
         #[TaggedLocator(tag: 'etl.extractor')] private readonly ServiceLocator   $extractors,
         #[TaggedLocator(tag: 'etl.transformer')] private readonly ServiceLocator $transformers,
         #[TaggedLocator(tag: 'etl.loader')] private readonly ServiceLocator      $loaders,
@@ -166,7 +165,7 @@ class EtlPipeline
         }
         $message = sprintf('Datu ielāde [%s] uzsākta', $this->pipelineId);
         $this->output->writeln($message);
-        $this->audit->audit(AuditBundle::ETL, $message);
+        $this->audit->audit(AuditType::ETL, $message);
 
         // EXTRACT -> TRANSFORM -> LOAD
         try {
@@ -195,7 +194,7 @@ class EtlPipeline
             $message = sprintf('<error>ETL [%s] neizdevās ar kļūdu: %s: %s</error>', $this->pipelineId, $exception::class, $exception->getMessage());
             $this->output->writeln("\n" . $message);
             $this->output->writeln(sprintf('<error>%s:%s</error>', $exception->getFile(), $exception->getLine()));
-            $this->audit->audit(AuditBundle::ETL, $message, [
+            $this->audit->audit(AuditType::ETL, $message, [
                 'file' => $exception->getFile(),
                 'line' => $exception->getLine(),
                 'trace' => $exception->getTraceAsString(),
@@ -206,7 +205,7 @@ class EtlPipeline
 
         $message = sprintf('Datu ielāde [%s] pabeigta', $this->pipelineId);
         $this->output->writeln($message);
-        $this->audit->audit(AuditBundle::ETL, $message);
+        $this->audit->audit(AuditType::ETL, $message);
 
         return true;
     }

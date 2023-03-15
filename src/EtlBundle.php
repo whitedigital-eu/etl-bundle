@@ -17,9 +17,5 @@ class EtlBundle extends AbstractBundle
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         $container->import('../config/services.php');
-
-        if (false === ($builder->getExtensionConfig('audit')[0]['enabled'] ?? false)) {
-            $container->import('../config/void_audit.php');
-        }
     }
 }
