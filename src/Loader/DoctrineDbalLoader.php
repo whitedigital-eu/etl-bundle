@@ -1,15 +1,16 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace WhiteDigital\EtlBundle\Loader;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
-use WhiteDigital\Audit\AuditBundle;
+use Error;
+use Exception;
+use WhiteDigital\Audit\Contracts\AuditServiceInterface;
 use WhiteDigital\Audit\Contracts\AuditType;
-use WhiteDigital\Audit\Service\AuditServiceLocator;
 use WhiteDigital\EtlBundle\Command\Output\WebProgressBar;
 use WhiteDigital\EtlBundle\Exception\LoaderException;
 use WhiteDigital\EtlBundle\Helper\CallbackQuery;
@@ -23,7 +24,7 @@ use WhiteDigital\EtlBundle\Helper\Queue;
 class DoctrineDbalLoader extends AbstractLoader
 {
     public function __construct(
-        private readonly AuditServiceLocator $audit,
+        private readonly AuditServiceInterface $audit,
         private readonly ManagerRegistry $doctrine,
     ) {
     }
@@ -56,7 +57,7 @@ class DoctrineDbalLoader extends AbstractLoader
                 if ($record instanceof QueryBuilder) { // Insert or Update Query
                     try {
                         $record->executeQuery();
-                    } catch (\Error $error) {
+                    } catch (Error $error) {
                         throw new LoaderException($error->getMessage(), previous: $error);
                     }
 
@@ -93,7 +94,7 @@ class DoctrineDbalLoader extends AbstractLoader
             if ($numberInserts > 0 || $numberUpdates > 0) {
                 $this->audit->audit(AuditType::ETL, sprintf('Loader query log with %s INSERTs, %s UPDATEs and %s DELETEs', $numberInserts, $numberUpdates, $numberDeletes), $queryLog);
             }
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             $connection->rollBack();
             throw $exception;
         }

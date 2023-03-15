@@ -1,6 +1,6 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace WhiteDigital\EtlBundle\Helper;
 
@@ -11,8 +11,9 @@ use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\PropertyAccess\PropertyAccess;
 use Symfony\Component\Security\Core\Security;
-use WhiteDigital\Audit\AuditBundle;
-use WhiteDigital\Audit\Service\AuditServiceLocator;
+use Throwable;
+use WhiteDigital\Audit\Contracts\AuditServiceInterface;
+use WhiteDigital\Audit\Contracts\AuditType;
 
 final class NotificationService
 {
@@ -21,7 +22,7 @@ final class NotificationService
 
     public function __construct(
         private readonly MailerInterface $mailer,
-        private readonly AuditServiceLocator $audit,
+        private readonly AuditServiceInterface $audit,
         private readonly Security $security,
     ) {
     }
@@ -50,7 +51,7 @@ final class NotificationService
 
         $this->mailer->send($email);
         $output->writeln("E-pasta ziņojums nosūtīts adresātam {$currentEmail}");
-        $this->audit->audit(AuditBundle::ETL, "Notifications sent to $currentEmail", ['notification' => $notificationData]);
+        $this->audit->audit(AuditType::ETL, "Notifications sent to $currentEmail", ['notification' => $notificationData]);
     }
 
     public function addNotificationContext(string $context): void
@@ -69,13 +70,13 @@ final class NotificationService
         foreach ($afterChangesFields as $key => $value) {
             if (str_ends_with($key, 'Id')) { // It is ORM relation. For example customerId, we should get customer->getId()
                 $relationName = substr($key, 0, -2);
-                $getterMethod = 'get'.ucfirst($relationName);
+                $getterMethod = 'get' . ucfirst($relationName);
                 if (!method_exists($beforeChanges, $getterMethod)) {
                     throw new RuntimeException("{$getterMethod} does not exist in beforeChanges object.");
                 }
                 try {
                     $beforeChangesFields[$key] = $beforeChanges->{$getterMethod}()?->getId();
-                } catch (\Throwable $error) {
+                } catch (Throwable $error) {
                     $beforeChangesFields[$key] = null;
                 }
             } else {
