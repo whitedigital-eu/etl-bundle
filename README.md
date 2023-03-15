@@ -12,7 +12,7 @@ Tasks can be run:
 ## Requirements
 
 1. PHP 8.1+  
-2. Symfony 6.1+  
+2. Symfony 6.2+  
 
 ## Install bundle
 ```bash 
