@@ -1,10 +1,9 @@
 <?php
 
-declare(strict_types=1);
+declare(strict_types = 1);
 
 namespace WhiteDigital\EtlBundle\Helper;
 
-use DateTimeInterface;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
@@ -13,11 +12,10 @@ use Doctrine\DBAL\Statement;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\Persistence\ManagerRegistry;
-use RuntimeException;
 use JetBrains\PhpStorm\ArrayShape;
-use Symfony\Component\PropertyAccess\PropertyAccess;
 use Symfony\Contracts\Service\Attribute\Required;
 use WhiteDigital\EntityResourceMapper\Entity\BaseEntity;
+use WhiteDigital\EntityResourceMapper\UTCDateTimeImmutable;
 use WhiteDigital\EtlBundle\Exception\EtlException;
 
 trait DbalHelperTrait
@@ -44,55 +42,8 @@ trait DbalHelperTrait
     }
 
     /**
-     * @deprecated
-     * @throws Exception
-     */
-    protected function executeDBALInsertQuery(string $table, array|object $data, bool $addCreated = true): void
-    {
-        $query = $this->createDBALInsertQuery($table, $data, $addCreated);
-        $query->executeQuery();
-    }
-
-    /**
-     * @deprecated
-     * @throws EtlException
-     * @throws Exception
-     */
-    protected function executeDBALUpdateQuery(string $table, array|object $data, int $id): void
-    {
-        $query = $this->createDBALUpdateQuery($table, $data, $id);
-        $query->executeQuery();
-    }
-
-    /**
-     * @deprecated
-     */
-    protected function createDBALInsertQuery(string $table, array|object $data, bool $addCreated = true): QueryBuilder
-    {
-        /**
-         * @var Connection   $connection
-         * @var QueryBuilder $query
-         */
-        $connection = $this->doctrine->getConnection();
-        $queryBuilder = $connection->createQueryBuilder();
-        $queryBuilder->insert($table);
-        $data = $this->normalizeData($data);
-        foreach ($data as $col => $val) {
-            $queryBuilder
-                ->setParameter($this->toColumnName($col), $val)
-                ->setValue($this->toColumnName($col), ':'.$this->toColumnName($col));
-        }
-        if ($addCreated) {
-            $queryBuilder->setValue('created_at', ':created_at')
-                ->setParameter('created_at', (new \DateTime())->format('Y-m-d H:i:s'));
-        }
-
-        return $queryBuilder;
-    }
-
-    /**
      * @param class-string $entity
-     * @param string[] $conditions
+     * @param string[]     $conditions
      */
     protected function createDBALDeleteQuery(string $entity, array $conditions): QueryBuilder
     {
@@ -139,14 +90,14 @@ trait DbalHelperTrait
             // process scalar types
             if (in_array($propertyName, $fieldNames, true) && (null !== $value = $property->getValue($entity))) {
                 $columnName = $entityMetaData->getColumnName($propertyName);
-                if ($value instanceof DateTimeInterface) {
-                    $value = $value->format(DateTimeInterface::RFC3339);
+                if ($value instanceof \DateTimeInterface) {
+                    $value = $value->format(\DateTimeInterface::RFC3339);
                 }
                 if ($value instanceof \BackedEnum) {
                     $value = $value->value;
                 }
                 $queryBuilder
-                    ->setValue($columnName, ':'.$columnName)
+                    ->setValue($columnName, ':' . $columnName)
                     ->setParameter($columnName, $value);
                 continue;
             }
@@ -159,19 +110,18 @@ trait DbalHelperTrait
                 if (1 === count($joinColumn = $associationMappings[$propertyName]['joinColumnFieldNames'])) {
                     $columnName = current($joinColumn);
                     $queryBuilder
-                        ->setValue($columnName, ':'.$columnName)
+                        ->setValue($columnName, ':' . $columnName)
                         ->setParameter($columnName, $value->getId());
                     continue;
-                } else {
-                    continue;
-                    // TODO handle multiple join columns
                 }
+                continue;
+                // TODO handle multiple join columns
             }
         }
 
         if ($addCreated) {
             $queryBuilder->setValue('created_at', ':created_at')
-                ->setParameter('created_at', (new \DateTime())->format(DateTimeInterface::RFC3339));
+                ->setParameter('created_at', (new UTCDateTimeImmutable())->format(\DateTimeInterface::RFC3339));
         }
 
         return $queryBuilder;
@@ -179,8 +129,10 @@ trait DbalHelperTrait
 
     /**
      * Special case of update query, explicitly setting given fields to null.
+     *
      * @param class-string $entity
-     * @param string[] $nullableFields
+     * @param string[]     $nullableFields
+     *
      * @return QueryBuilder
      */
     protected function createDBALUpdateQuerySetNull(string $entity, mixed $id, array $nullableFields): ?QueryBuilder
@@ -206,12 +158,10 @@ trait DbalHelperTrait
             ->setParameter('id', $id);
         // Always set Updated
         $queryBuilder->set('updated_at', ':updated_at')
-            ->setParameter('updated_at', (new \DateTimeImmutable())->format(DateTimeInterface::RFC3339));
+            ->setParameter('updated_at', (new UtcDateTimeImmutable())->format(\DateTimeInterface::RFC3339));
 
         return $queryBuilder;
-
     }
-
 
     /**
      * Will return null, if nothing to update, QueryBuilder otherwise.
@@ -221,7 +171,7 @@ trait DbalHelperTrait
      */
     protected function createDBALUpdateQueryFromEntity(BaseEntity $existingEntity, BaseEntity $newEntity, bool $replaceExisting = false): ?QueryBuilder
     {
-        if (get_class($existingEntity) !== get_class($newEntity)) {
+        if ($existingEntity::class !== $newEntity::class) {
             throw new EtlException('createDBALUpdateQueryFromEntity must receive objects from same class.');
         }
         $hasChanges = false;
@@ -246,20 +196,20 @@ trait DbalHelperTrait
         foreach ($reflection->getProperties() as $property) {
             $propertyName = $property->getName();
 
-            // process scalar types
+            // process scalar and datetime types
             if (in_array($propertyName, $fieldNames, true)
                 && (null !== $value = $property->getValue($newEntity)) // new value is not NULL
-                && (null === $property->getValue($existingEntity) || ($replaceExisting && $property->getValue($existingEntity) !== $property->getValue($newEntity))) // existing value is NULL OR we allow to replace existing value explicitly
+                && (null === $property->getValue($existingEntity) || ($replaceExisting && !$this->isEqual($property->getValue($existingEntity), $property->getValue($newEntity)))) // existing value is NULL OR we allow to replace existing value explicitly
             ) {
                 $columnName = $entityMetaData->getColumnName($propertyName);
-                if ($value instanceof DateTimeInterface) {
-                    $value = $value->format(DateTimeInterface::RFC3339);
+                if ($value instanceof \DateTimeInterface) {
+                    $value = $value->format(\DateTimeInterface::RFC3339);
                 }
                 if ($value instanceof \BackedEnum) {
                     $value = $value->value;
                 }
                 $queryBuilder
-                    ->set($columnName, ':'.$columnName)
+                    ->set($columnName, ':' . $columnName)
                     ->setParameter($columnName, $value);
                 $hasChanges = true;
                 continue;
@@ -276,14 +226,13 @@ trait DbalHelperTrait
                 if (1 === count($joinColumn = $associationMappings[$propertyName]['joinColumnFieldNames'])) {
                     $columnName = current($joinColumn);
                     $queryBuilder
-                        ->set($columnName, ':'.$columnName)
+                        ->set($columnName, ':' . $columnName)
                         ->setParameter($columnName, $value->getId());
                     $hasChanges = true;
                     continue;
-                } else {
-                    continue;
-                    // TODO handle multiple join columns
                 }
+                continue;
+                // TODO handle multiple join columns
             }
         }
 
@@ -296,7 +245,7 @@ trait DbalHelperTrait
             ->setParameter('id', $existingEntity->getId());
         // always set Updated
         $queryBuilder->set('updated_at', ':updated_at')
-            ->setParameter('updated_at', (new \DateTimeImmutable())->format(DateTimeInterface::RFC3339));
+            ->setParameter('updated_at', (new UTCDateTimeImmutable())->format(\DateTimeInterface::RFC3339));
 
         return $queryBuilder;
     }
@@ -319,31 +268,6 @@ trait DbalHelperTrait
         return $res->fetchAssociative()['id'] ?? null;
     }
 
-    /**
-     * @throws Exception
-     */
-    protected function executeDBALInsertIfNotExistQuery(string $table, array|object $data, bool $addCreated = true): bool
-    {
-        $conditions = [];
-        $data = $this->normalizeData($data);
-        /** @var Connection $connection */
-        $connection = $this->doctrine->getConnection();
-
-        foreach ($data as $key => $value) {
-            $conditions[] = sprintf('%s = :%s', $this->toColumnName($key), $key);
-        }
-        $condition = implode(' AND ', $conditions);
-        $validate = sprintf('SELECT * FROM %s WHERE %s', $table, $condition);
-        $results = $connection->executeQuery($validate, $data);
-        if (0 === $results->rowCount()) {
-            $q = $this->createDBALInsertQuery($table, $data, $addCreated);
-            $q->executeQuery();
-
-            return true;
-        }
-
-        return false;
-    }
 
     /**
      * Create `INSERT INTO <table> (a, b, c) VALUES(:a, :b, :c) RETURNING id` Statement object
@@ -355,7 +279,7 @@ trait DbalHelperTrait
     {
         $data = $this->normalizeData($data);
         if ($addCreated) {
-            $data['created_at'] = (new \DateTime())->format(DateTimeInterface::RFC3339);
+            $data['created_at'] = (new UTCDateTimeImmutable())->format(\DateTimeInterface::RFC3339);
         }
         /** @var Connection $connection */
         $connection = $this->doctrine->getConnection();
@@ -378,7 +302,7 @@ trait DbalHelperTrait
     {
         $data = $this->normalizeData($data);
         if ($addCreated) {
-            $data['created_at'] = (new \DateTime())->format(DateTimeInterface::RFC3339);
+            $data['created_at'] = (new UTCDateTimeImmutable())->format(\DateTimeInterface::RFC3339);
         }
         /** @var Connection $connection */
         $connection = $this->doctrine->getConnection();
@@ -388,108 +312,12 @@ trait DbalHelperTrait
         return $result->fetchAssociative()['id'];
     }
 
-    /**
-     * @deprecated
-     */
-    protected function createDBALUpdateQuery(string $table, array $data, int $id): ?QueryBuilder
-    {
-        if (empty($data)) {
-            return null;
-        }
-        if (empty($id)) {
-            throw new EtlException(sprintf('empty ID received for %s', __METHOD__));
-        }
-        /**
-         * @var Connection $connection ;
-         * @var QueryBuilder $query
-         */
-        $connection = $this->doctrine->getConnection();
-        $queryBuilder = $connection->createQueryBuilder();
-        $queryBuilder->update($table);
-        foreach ($data as $col => $val) {
-            $queryBuilder->set($this->toColumnName($col), ':' . $this->toColumnName($col))
-                ->setParameter($this->toColumnName($col), $val);
-        }
-        // set condition
-        $queryBuilder->where('id = :id')
-            ->setParameter('id', $id);
-        // always set Updated
-        $queryBuilder->set('updated_at', ':updated_at')
-            ->setParameter('updated_at', (new DateTime())->format('Y-m-d H:i:s'));
-
-        return $queryBuilder;
-    }
 
     /**
-     * In case when child records needs to be inserted with ID created in parent record insert.
-     * Return array shape: ['main' => <Statement>, 'child' => <QueryBuilder[]> ].
+     * Will return array where first field will be key and rest as array.
      *
-     * @throws Exception
-     */
-    #[ArrayShape(['main' => Statement::class, 'child' => 'array'])]
-    protected function createDBALChainedInsertQuery(string $mainTable, array|object $mainData, array $childTableData, bool $addCreated = true): array
-    {
-        $output = [
-            'main' => $this->createDBALInsertQueryReturning($mainTable, $mainData, $addCreated),
-            'child' => [],
-        ];
-        foreach ($childTableData as $tableName => $data) {
-            $output['child'][] = $this->createDBALInsertQuery($tableName, $data);
-        }
-
-        return $output;
-    }
-
-    /**
-     * @deprecated
-     */
-    protected function returnUpdatedFields(BaseEntity $existingEntity, object $transformedRecord, array $skipFields = [], bool $replaceExisting = false): array
-    {
-        $propertyAccessor = PropertyAccess::createPropertyAccessor();
-        $updatedFields = [];
-        foreach ($transformedRecord as $key => $value) {
-            if (in_array($key, $skipFields, true)) {
-                continue;
-            }
-            $isRelation = false;
-            if (str_ends_with($key, 'Id')) { // It is ORM relation. For example customerId, we should get customer->getId()
-                $isRelation = true;
-                $relationName = substr($key, 0, -2);
-                $getterMethod = 'get' . ucfirst($relationName);
-                if (!method_exists($existingEntity, $getterMethod)) {
-                    throw new RuntimeException("{$getterMethod} does not exist in existingEntity object.");
-                }
-                try {
-                    $propertyValue = $existingEntity->{$getterMethod}()?->getId();
-                } catch (\Throwable $error) {
-                    $propertyValue = null;
-                }
-            } else {
-                $propertyValue = $propertyAccessor->getValue($existingEntity, $key);
-            }
-
-            // Update only NULL values or any changed value if $replaceExisting === true
-            if (null !== $value && ((null === $propertyValue && false === $replaceExisting) || ($value !== $propertyValue && true === $replaceExisting && !is_object($propertyValue)))) {
-                $updatedFields[$key] = $value;
-                // Let's set value for existing object, so repeating updates are skipped in current batch
-                if ($isRelation) {
-                    continue; // TODO  if property is relation, won't update it for now.
-                }
-                $reflectionProperty = new \ReflectionProperty($existingEntity, $key);
-                if (\DateTimeInterface::class === $reflectionProperty->getType()?->getName()) {
-                    $value = new \DateTimeImmutable($value);
-                }
-                $propertyAccessor->setValue($existingEntity, $key, $value);
-            }
-        }
-
-        return $updatedFields;
-    }
-
-    /**
-     * Will return array where first field will be key and rest as array
-     * @param string $sql
      * @return array<string, array>
+     *
      * @throws Exception
      */
     protected function createExistingHashMap(string $sql): array
@@ -504,7 +332,7 @@ trait DbalHelperTrait
         foreach ($results->iterateAssociative() as $record) {
             $isFirst = true;
             $hash = '';
-            foreach($record as $key => $value) {
+            foreach ($record as $key => $value) {
                 if ($isFirst) {
                     $hash = $value;
                     $isFirst = false;
@@ -513,6 +341,7 @@ trait DbalHelperTrait
                 $output[$hash][$key] = $value;
             }
         }
+
         return $output;
     }
 
@@ -549,5 +378,15 @@ trait DbalHelperTrait
         return (new UnderscoreNamingStrategy())->propertyToColumnName($propertyName);
     }
 
+    /**
+     * Return true, if two scalar values are equal or two DateTime objects represents same time.
+     */
+    private function isEqual(mixed $a, mixed $b): bool
+    {
+        if ($a instanceof \DateTimeInterface && $b instanceof \DateTimeInterface) {
+            return $a->getTimestamp() === $b->getTimestamp();
+        }
 
+        return $a === $b;
+    }
 }
