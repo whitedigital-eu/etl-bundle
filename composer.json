@@ -46,6 +46,8 @@
         }
     },
     "require-dev": {
+        "roave/security-advisories": "dev-latest"
+        ,
         "whitedigital-eu/config-pack": "*"
     }
 }
