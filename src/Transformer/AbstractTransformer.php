@@ -1,10 +1,8 @@
-<?php
+<?php declare(strict_types = 1);
 
 /**
  * @author andis @ 23.11.2022
  */
-
-declare(strict_types=1);
 
 namespace WhiteDigital\EtlBundle\Transformer;
 
@@ -12,30 +10,28 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Contracts\Service\Attribute\Required;
 use WhiteDigital\EtlBundle\Exception\EtlException;
-use WhiteDigital\EtlBundle\Exception\ExtractorException;
 use WhiteDigital\EtlBundle\Exception\TransformerException;
 use WhiteDigital\EtlBundle\Helper\EtlValidator;
 use WhiteDigital\EtlBundle\Helper\ValidatorType;
 
 abstract class AbstractTransformer implements TransformerInterface
 {
+    protected EntityManagerInterface $entityManager;
+
+    protected OutputInterface $output;
     /** @var array<EtlValidator> */
     private array $validators = [];
     /** @var string[] */
     private array $validatorFailures = [];
-    protected EntityManagerInterface $entityManager;
+
+    /** @var array<string, mixed> */
+    private array $options;
 
     #[Required]
     public function setEntityManager(EntityManagerInterface $entityManager): void
     {
         $this->entityManager = $entityManager;
     }
-
-    protected OutputInterface $output;
-
-    /** @var array<string, mixed> */
-    private array $options;
-
 
     public function setOutput(OutputInterface $output): void
     {
@@ -50,21 +46,25 @@ abstract class AbstractTransformer implements TransformerInterface
         $this->options = $options;
     }
 
-    /**
-     * @throws ExtractorException
-     */
     public function getOption(string $key): mixed
     {
-        if (!array_key_exists($key, $this->options)) {
-            throw new ExtractorException(sprintf('Requested option key [%s] not set', $key));
-        }
-
-        return $this->options[$key];
+        return $this->options[$key] ?? null;
     }
 
     public function displayStartupMessage(): void
     {
-        $this->output->writeln(sprintf("\n<info>%s</info> uzsākts\n", get_class($this)));
+        $this->output->writeln(sprintf("\n<info>%s</info> uzsākts\n", static::class));
+    }
+
+    public function printValidatorFailures(): void
+    {
+        if (!empty($vf = $this->validatorFailures)) {
+            $this->output->writeln("\n<comment>Validācijas paziņojumi (neimportētie dati):</comment>");
+            foreach ($vf as $failure => $failureCount) {
+                $this->output->writeln("- [{$failure}]: [{$failureCount}]");
+            }
+        }
+        $this->output->writeln('');
     }
 
     protected function addValidator(EtlValidator $validator): void
@@ -98,18 +98,7 @@ abstract class AbstractTransformer implements TransformerInterface
         if (!array_key_exists($validator, $this->validatorFailures)) {
             $this->validatorFailures[$validator] = 1;
         } else {
-            ++$this->validatorFailures[$validator];
+            $this->validatorFailures[$validator]++;
         }
-    }
-
-    public function printValidatorFailures(): void
-    {
-        if (!empty($vf = $this->validatorFailures)) {
-            $this->output->writeln("\n<comment>Validācijas paziņojumi (neimportētie dati):</comment>");
-            foreach ($vf as $failure => $failureCount) {
-                $this->output->writeln("- [{$failure}]: [{$failureCount}]");
-            }
-        }
-        $this->output->writeln('');
     }
 }

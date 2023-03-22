@@ -1,24 +1,19 @@
-<?php
+<?php declare(strict_types = 1);
 
 /**
  * @author andis @ 23.11.2022
  */
 
-declare(strict_types=1);
-
 namespace WhiteDigital\EtlBundle\Loader;
 
 use Symfony\Component\Console\Output\OutputInterface;
-use WhiteDigital\EtlBundle\Exception\ExtractorException;
 
 abstract class AbstractLoader implements LoaderInterface
 {
-
     protected OutputInterface $output;
 
     /** @var array<string, mixed> */
     private array $options;
-
 
     public function setOutput(OutputInterface $output): void
     {
@@ -33,20 +28,13 @@ abstract class AbstractLoader implements LoaderInterface
         $this->options = $options;
     }
 
-    /**
-     * @throws ExtractorException
-     */
     public function getOption(string $key): mixed
     {
-        if (!array_key_exists($key, $this->options)) {
-            throw new ExtractorException(sprintf('Requested option key [%s] not set', $key));
-        }
-
-        return $this->options[$key];
+        return $this->options[$key] ?? null;
     }
 
     public function displayStartupMessage(): void
     {
-        $this->output->writeln(sprintf("\n<info>%s</info> uzsākts\n", get_class($this)));
+        $this->output->writeln(sprintf("\n<info>%s</info> uzsākts\n", static::class));
     }
 }
