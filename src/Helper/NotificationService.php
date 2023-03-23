@@ -6,11 +6,11 @@ namespace WhiteDigital\EtlBundle\Helper;
 
 use RuntimeException;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\PropertyAccess\PropertyAccess;
-use Symfony\Component\Security\Core\Security;
 use Throwable;
 use WhiteDigital\Audit\Contracts\AuditServiceInterface;
 use WhiteDigital\Audit\Contracts\AuditType;
