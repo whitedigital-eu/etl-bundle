@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace WhiteDigital\EtlBundle\Helper;
 
-use JetBrains\PhpStorm\ArrayShape;
-
 class CallbackQuery
 {
     public function __construct(
@@ -16,7 +14,6 @@ class CallbackQuery
     /**
      * Execute callback function and return stats (number of inserts and updates).
      */
-    #[ArrayShape(['insert' => 'int|mixed', 'update' => 'int|mixed', 'delete' => 'int|mixed', 'log' => 'array'])]
     public function execute(): array
     {
         $result = $this->callbackFunction->__invoke();
