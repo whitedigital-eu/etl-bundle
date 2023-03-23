@@ -12,7 +12,6 @@ use Doctrine\DBAL\Statement;
 use Doctrine\ORM\Mapping\ClassMetadata;
 use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\Persistence\ManagerRegistry;
-use JetBrains\PhpStorm\ArrayShape;
 use Symfony\Contracts\Service\Attribute\Required;
 use WhiteDigital\EntityResourceMapper\Entity\BaseEntity;
 use WhiteDigital\EntityResourceMapper\UTCDateTimeImmutable;
