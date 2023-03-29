@@ -13,6 +13,7 @@ class CallbackQuery
 
     /**
      * Execute callback function and return stats (number of inserts and updates).
+     * @return array{insert: int|mixed, update: int|mixed, delete: int|mixed, log: array}
      */
     public function execute(): array
     {
