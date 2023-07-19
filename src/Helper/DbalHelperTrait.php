@@ -7,6 +7,7 @@ namespace WhiteDigital\EtlBundle\Helper;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\DBAL\Statement;
 use Doctrine\ORM\Mapping\ClassMetadata;
@@ -95,9 +96,13 @@ trait DbalHelperTrait
                 if ($value instanceof \BackedEnum) {
                     $value = $value->value;
                 }
+                $type = ParameterType::STRING;
+                if (is_bool($value)) {
+                    $type = ParameterType::BOOLEAN;
+                }
                 $queryBuilder
                     ->setValue($columnName, ':' . $columnName)
-                    ->setParameter($columnName, $value);
+                    ->setParameter($columnName, $value, $type);
                 continue;
             }
             // process associations
@@ -207,9 +212,13 @@ trait DbalHelperTrait
                 if ($value instanceof \BackedEnum) {
                     $value = $value->value;
                 }
+                $type = ParameterType::STRING;
+                if (is_bool($value)) {
+                    $type = ParameterType::BOOLEAN;
+                }
                 $queryBuilder
                     ->set($columnName, ':' . $columnName)
-                    ->setParameter($columnName, $value);
+                    ->setParameter($columnName, $value, $type);
                 $hasChanges = true;
                 continue;
             }
