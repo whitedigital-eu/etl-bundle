@@ -36,7 +36,7 @@
         "symfony/security-bundle": "^6.2",
         "symfony/service-contracts": "*",
         "symfony/twig-bridge": "^6.2",
-        "whitedigital-eu/audit-service": "^0.5",
+        "whitedigital-eu/audit-service": "^0.5|^0.6",
         "whitedigital-eu/entity-resource-mapper-bundle": "*"
     },
     "extra": {
