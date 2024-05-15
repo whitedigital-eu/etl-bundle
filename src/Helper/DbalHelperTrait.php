@@ -136,8 +136,6 @@ trait DbalHelperTrait
      *
      * @param class-string $entity
      * @param string[]     $nullableFields
-     *
-     * @return QueryBuilder
      */
     protected function createDBALUpdateQuerySetNull(string $entity, mixed $id, array $nullableFields): ?QueryBuilder
     {
@@ -162,7 +160,7 @@ trait DbalHelperTrait
             ->setParameter('id', $id);
         // Always set Updated
         $queryBuilder->set('updated_at', ':updated_at')
-            ->setParameter('updated_at', (new UtcDateTimeImmutable())->format(\DateTimeInterface::RFC3339));
+            ->setParameter('updated_at', (new UTCDateTimeImmutable())->format(\DateTimeInterface::RFC3339));
 
         return $queryBuilder;
     }
@@ -171,9 +169,11 @@ trait DbalHelperTrait
      * Will return null, if nothing to update, QueryBuilder otherwise.
      * ReplaceExisting=true will replace only scalar values for now.
      *
+     * @param string[] $denyReplace
+     *
      * @throws EtlException
      */
-    protected function createDBALUpdateQueryFromEntity(BaseEntity $existingEntity, BaseEntity $newEntity, bool $replaceExisting = false): ?QueryBuilder
+    protected function createDBALUpdateQueryFromEntity(BaseEntity $existingEntity, BaseEntity $newEntity, bool $replaceExisting = false, array $denyReplace = []): ?QueryBuilder
     {
         if ($existingEntity::class !== $newEntity::class) {
             throw new EtlException('createDBALUpdateQueryFromEntity must receive objects from same class.');
@@ -199,10 +199,13 @@ trait DbalHelperTrait
 
         foreach ($reflection->getProperties() as $property) {
             $propertyName = $property->getName();
+            if (in_array($propertyName, $denyReplace, true)) {
+                continue;
+            }
 
             // process scalar and datetime types
             if (in_array($propertyName, $fieldNames, true)
-                && (null !== $value = $property->getValue($newEntity)) // new value is not NULL
+                && ((null !== $value = $property->getValue($newEntity)) && (!empty($value))) // new value is not NULL nor empty array
                 && (null === $property->getValue($existingEntity) || ($replaceExisting && !$this->isEqual($property->getValue($existingEntity), $property->getValue($newEntity)))) // existing value is NULL OR we allow to replace existing value explicitly
             ) {
                 $columnName = $entityMetaData->getColumnName($propertyName);
@@ -224,8 +227,8 @@ trait DbalHelperTrait
             }
             // process associations
             if (array_key_exists($propertyName, $associationMappings)
-                && (null === $property->getValue($existingEntity))
                 && (null !== $value = $property->getValue($newEntity))
+                && (null === $property->getValue($existingEntity) || ($replaceExisting && (!$this->isEqual($property->getValue($existingEntity)->getId(), $value->getId()))))
             ) {
                 if ($value instanceof ArrayCollection) {
                     // TODO how to proceed with many to many associations?
@@ -276,7 +279,6 @@ trait DbalHelperTrait
         return $res->fetchAssociative()['id'] ?? null;
     }
 
-
     /**
      * Create `INSERT INTO <table> (a, b, c) VALUES(:a, :b, :c) RETURNING id` Statement object
      * which can be then used to insert related entities.
@@ -319,7 +321,6 @@ trait DbalHelperTrait
 
         return $result->fetchAssociative()['id'];
     }
-
 
     /**
      * Will return array where first field will be key and rest as array.
@@ -391,10 +392,19 @@ trait DbalHelperTrait
      */
     private function isEqual(mixed $a, mixed $b): bool
     {
+        if ($this->isFloat($a) && $this->isFloat($b)) {
+            return abs((float)$a - (float)$b) < 0.0001;
+        }
+
         if ($a instanceof \DateTimeInterface && $b instanceof \DateTimeInterface) {
             return $a->getTimestamp() === $b->getTimestamp();
         }
 
         return $a === $b;
+    }
+
+    private function isFloat($str): bool
+    {
+        return filter_var($str, FILTER_VALIDATE_FLOAT) !== false;
     }
 }

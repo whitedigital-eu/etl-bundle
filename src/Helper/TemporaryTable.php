@@ -1,11 +1,10 @@
-<?php
-
-declare(strict_types = 1);
+<?php declare(strict_types = 1);
 
 namespace WhiteDigital\EtlBundle\Helper;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
+use function Symfony\Component\String\u;
 
 class TemporaryTable
 {
@@ -17,12 +16,16 @@ class TemporaryTable
     /**
      * @throws Exception|\ReflectionException
      */
-    public function create(string $name, string $tempTableClass): void
+    public function create(string $name, string $tempTableClass, bool $createRealTable = false): void
     {
         if (!in_array(TemporaryTableInterface::class, class_implements($tempTableClass), true)) {
             throw new Exception('Class must implement TempTableInterface');
         }
-        $template = 'CREATE TEMPORARY TABLE %s(%s)';
+        if (!$createRealTable) {
+            $template = 'CREATE TEMPORARY TABLE %s(%s)';
+        } else {
+            $template = 'CREATE TABLE %s(%s)';
+        }
 
         $this->connection->executeQuery(sprintf($template, $name, $this->getDbColumns($tempTableClass)));
     }
@@ -38,7 +41,7 @@ class TemporaryTable
             if (null === $value) {
                 continue;
             }
-            $columns[] = $column;
+            $columns[] = $this->toSnakeCase($column);
             $values[] = $value;
         }
 
@@ -53,6 +56,63 @@ class TemporaryTable
     public function query(string $sql): array
     {
         return $this->connection->fetchAllAssociative($sql);
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function queryOne(string $sql): ?array
+    {
+        $result = $this->connection->fetchAllAssociative($sql);
+        if (0 === count($result)) {
+            return null;
+        }
+
+        if (1 !== count($result)) {
+            throw new \RuntimeException('Expected one row, got ' . count($result));
+        }
+
+        return $result[0];
+    }
+
+    /**
+     * @template T of TemporaryTableInterface
+     *
+     * @param class-string<T> $tempTableClass
+     *
+     * @return T|null
+     *
+     * @throws Exception
+     * @throws \ReflectionException
+     */
+    public function queryOneToTempTable(string $sql, string $tempTableClass): ?TemporaryTableInterface
+    {
+        if (!in_array(TemporaryTableInterface::class, class_implements($tempTableClass), true)) {
+            throw new Exception('Class must implement TempTableInterface');
+        }
+        $result = $this->queryOne($sql);
+        if (null === $result) {
+            return null;
+        }
+        $tempTable = new $tempTableClass();
+        $classReflection = new \ReflectionClass($tempTableClass);
+        foreach ($result as $column => $value) {
+            $reflectionType = $classReflection->getProperty($this->toCamelCase($column))->getType();
+            if ($reflectionType instanceof \ReflectionNamedType) {
+                $value = match ($reflectionType->getName()) {
+                    'int' => (int) $value,
+                    'float' => (float) $value,
+                    'bool' => (bool) $value,
+                    default => $value,
+                };
+            } else {
+                throw new \RuntimeException('Temp table contains unnamed type property');
+            }
+
+            $tempTable->{$this->toCamelCase($column)} = $value;
+        }
+
+        return $tempTable;
     }
 
     /**
@@ -79,7 +139,7 @@ class TemporaryTable
         $columns = [];
         $reflection = new \ReflectionClass($tempTableClass);
         foreach ($reflection->getProperties() as $property) {
-            $columns[] = $property->getName() . ' ' . $this->getDbType($property->getType());
+            $columns[] = $this->toSnakeCase($property->getName()) . ' ' . $this->getDbType($property->getType());
         }
 
         return implode(', ', $columns);
@@ -102,5 +162,25 @@ class TemporaryTable
             'bool' => 'BOOLEAN',
             default => throw new \RuntimeException("Unsupported type {$type->getName()} for temporary table column"),
         };
+    }
+
+    /**
+     * Converts fooBar to foo_bar - PG does not support camelCase column names
+     * @param string $input
+     * @return string
+     */
+    private function toSnakeCase(string $input): string
+    {
+        return (string) u($input)->snake();
+    }
+
+    /**
+     * Converts foo_bar to fooBar - PG does not support camelCase column names
+     * @param string $input
+     * @return string
+     */
+    private function toCamelCase(string $input): string
+    {
+        return (string) u($input)->camel();
     }
 }
