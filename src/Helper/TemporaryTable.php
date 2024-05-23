@@ -4,6 +4,7 @@ namespace WhiteDigital\EtlBundle\Helper;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
+use WhiteDigital\EntityResourceMapper\UTCDateTimeImmutable;
 use function Symfony\Component\String\u;
 
 class TemporaryTable
@@ -40,6 +41,9 @@ class TemporaryTable
         foreach (get_object_vars($data) as $column => $value) {
             if (null === $value) {
                 continue;
+            }
+            if ($value instanceof \DateTimeInterface) {
+                $value = $value->format('Y-m-d H:i:s');
             }
             $columns[] = $this->toSnakeCase($column);
             $values[] = $value;
@@ -160,7 +164,8 @@ class TemporaryTable
             'string' => 'VARCHAR',
             'float' => 'FLOAT',
             'bool' => 'BOOLEAN',
-            default => throw new \RuntimeException("Unsupported type {$type->getName()} for temporary table column"),
+            UTCDateTimeImmutable::class => 'timestamp',
+            default => throw new \RuntimeException("Unsupported type {$type->getName()} for temporary table."),
         };
     }
 
