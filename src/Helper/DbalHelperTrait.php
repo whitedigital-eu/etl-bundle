@@ -225,15 +225,18 @@ trait DbalHelperTrait
                 $hasChanges = true;
                 continue;
             }
+
             // process associations
+            $value = $property->getValue($newEntity);
+            if ($value instanceof ArrayCollection) {
+                // TODO how to proceed with many to many associations? Skip for now.
+                continue;
+            }
             if (array_key_exists($propertyName, $associationMappings)
-                && (null !== $value = $property->getValue($newEntity))
+                && (null !== $value)
                 && (null === $property->getValue($existingEntity) || ($replaceExisting && (!$this->isEqual($property->getValue($existingEntity)->getId(), $value->getId()))))
             ) {
-                if ($value instanceof ArrayCollection) {
-                    // TODO how to proceed with many to many associations?
-                    continue;
-                }
+
                 if (1 === count($joinColumn = $associationMappings[$propertyName]['joinColumnFieldNames'])) {
                     $columnName = current($joinColumn);
                     $queryBuilder
