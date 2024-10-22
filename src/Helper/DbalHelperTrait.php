@@ -100,6 +100,9 @@ trait DbalHelperTrait
                 if (is_bool($value)) {
                     $type = ParameterType::BOOLEAN;
                 }
+                if (is_array($value)) {
+                    $value = json_encode($value);
+                }
                 $queryBuilder
                     ->setValue($columnName, ':' . $columnName)
                     ->setParameter($columnName, $value, $type);
@@ -218,6 +221,9 @@ trait DbalHelperTrait
                 $type = ParameterType::STRING;
                 if (is_bool($value)) {
                     $type = ParameterType::BOOLEAN;
+                }
+                if (is_array($value)) {
+                    $value = json_encode($value);
                 }
                 $queryBuilder
                     ->set($columnName, ':' . $columnName)
