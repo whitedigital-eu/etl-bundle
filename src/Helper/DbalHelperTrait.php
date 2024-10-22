@@ -205,7 +205,7 @@ trait DbalHelperTrait
 
             // process scalar and datetime types
             if (in_array($propertyName, $fieldNames, true)
-                && ((null !== $value = $property->getValue($newEntity)) && (!empty($value))) // new value is not NULL nor empty array
+                && ((null !== $value = $property->getValue($newEntity)) && [] !== $value) // new value is not NULL nor empty array
                 && (null === $property->getValue($existingEntity) || ($replaceExisting && !$this->isEqual($property->getValue($existingEntity), $property->getValue($newEntity)))) // existing value is NULL OR we allow to replace existing value explicitly
             ) {
                 $columnName = $entityMetaData->getColumnName($propertyName);
